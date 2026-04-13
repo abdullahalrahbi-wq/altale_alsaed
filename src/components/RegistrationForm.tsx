@@ -258,114 +258,96 @@ export default function RegistrationForm() {
       </Card>
 
       {/* Recent Registrations Table */}
-      <Card className="mt-12 border-slate-200 shadow-sm overflow-hidden">
-        <CardHeader className="bg-slate-50 border-b border-slate-100">
+      <Card className="mt-8 border-slate-200 shadow-sm overflow-hidden">
+        <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
           <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <TableIcon className="w-5 h-5" />
             آخر المسجلين
           </CardTitle>
-          <CardDescription>قائمة بأحدث 10 متسابقين تم تسجيلهم في النظام</CardDescription>
+          <CardDescription>قائمة بأحدث المتسابقين المسجلين</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50/50">
-                <TableHead className="text-right">الاسم</TableHead>
-                <TableHead className="text-right">المستوى</TableHead>
-                <TableHead className="text-right">البلدة</TableHead>
-                <TableHead className="text-right">الجنس</TableHead>
-                <TableHead className="text-left">الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {registrations.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-slate-500">لا يوجد مسجلون حالياً</TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50/50">
+                  <TableHead className="text-right whitespace-nowrap">الاسم</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">المستوى</TableHead>
+                  <TableHead className="text-right whitespace-nowrap hidden sm:table-cell">البلدة</TableHead>
+                  <TableHead className="text-left whitespace-nowrap">الإجراءات</TableHead>
                 </TableRow>
-              ) : (
-                registrations.map((reg) => (
-                  <TableRow key={reg.id}>
-                    <TableCell className="font-medium">
-                      {editingId === reg.id ? (
-                        <Input 
-                          value={editData.name} 
-                          onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                          className="h-8"
-                        />
-                      ) : reg.name}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === reg.id ? (
-                        <Select 
-                          value={editData.level_id} 
-                          onValueChange={(val) => setEditData({ ...editData, level_id: val })}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {competition.levels.map((l: any) => (
-                              <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Badge variant="outline" className="font-normal">{reg.level_name}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === reg.id ? (
-                        <Input 
-                          value={editData.town} 
-                          onChange={(e) => setEditData({ ...editData, town: e.target.value })}
-                          className="h-8"
-                        />
-                      ) : reg.town}
-                    </TableCell>
-                    <TableCell>
-                      {editingId === reg.id ? (
-                        <Select 
-                          value={editData.gender} 
-                          onValueChange={(val) => setEditData({ ...editData, gender: val })}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="male">ذكر</SelectItem>
-                            <SelectItem value="female">أنثى</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (reg.gender === 'male' ? 'ذكر' : 'أنثى')}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {editingId === reg.id ? (
-                          <>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={handleSaveEdit}>
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400" onClick={() => setEditingId(null)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handleStartEdit(reg)}>
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleDelete(reg.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
+              </TableHeader>
+              <TableBody>
+                {registrations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">لا يوجد مسجلون حالياً</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  registrations.map((reg) => (
+                    <TableRow key={reg.id}>
+                      <TableCell className="font-medium py-3">
+                        {editingId === reg.id ? (
+                          <Input 
+                            value={editData.name} 
+                            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                            className="h-9 text-sm"
+                          />
+                        ) : (
+                          <div className="flex flex-col">
+                            <span>{reg.name}</span>
+                            <span className="text-[10px] text-slate-500 sm:hidden">{reg.town}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        {editingId === reg.id ? (
+                          <Select 
+                            value={editData.level_id} 
+                            onValueChange={(val) => setEditData({ ...editData, level_id: val })}
+                          >
+                            <SelectTrigger className="h-9 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {competition.levels.map((l: any) => (
+                                <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant="outline" className="font-normal text-[10px] px-1 py-0">{reg.level_name}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell py-3">{reg.town}</TableCell>
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-1">
+                          {editingId === reg.id ? (
+                            <>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-emerald-600" onClick={handleSaveEdit}>
+                                <Save className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400" onClick={() => setEditingId(null)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600" onClick={() => handleStartEdit(reg)}>
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600" onClick={() => handleDelete(reg.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
