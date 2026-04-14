@@ -427,8 +427,19 @@ export default function AdminDashboard() {
                           ) : r.town}
                         </TableCell>
                         <TableCell className="text-center">
-                          <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${r.judge_count >= 2 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
-                            {r.judge_count} / 2
+                          <div className="flex flex-col items-center gap-1">
+                            <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${r.judge_count >= 2 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                              {r.judge_count} / 2
+                            </div>
+                            {r.judge_info && r.judge_info.length > 0 && (
+                              <div className="flex flex-col gap-0.5 mt-1">
+                                {r.judge_info.map((j: any) => (
+                                  <div key={j.id} className="text-[9px] text-slate-500 whitespace-nowrap">
+                                    {j.name} ({j.phone})
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">

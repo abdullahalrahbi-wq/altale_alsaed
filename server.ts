@@ -63,6 +63,8 @@ db.exec(`
     criteria_id INTEGER,
     juz_index INTEGER DEFAULT 0,
     score REAL NOT NULL,
+    judge_name TEXT,
+    judge_phone TEXT,
     FOREIGN KEY(contestant_id) REFERENCES contestants(id),
     FOREIGN KEY(criteria_id) REFERENCES criteria(id)
   );
@@ -90,6 +92,13 @@ try {
 } catch (e) {}
 try {
   db.prepare("ALTER TABLE evaluations ADD COLUMN juz_index INTEGER DEFAULT 0").run();
+} catch (e) {}
+
+try {
+  db.prepare("ALTER TABLE evaluations ADD COLUMN judge_name TEXT").run();
+} catch (e) {}
+try {
+  db.prepare("ALTER TABLE evaluations ADD COLUMN judge_phone TEXT").run();
 } catch (e) {}
 
 // Seed initial admin if not exists
@@ -194,13 +203,13 @@ async function startServer() {
 
   // Submit evaluation
   app.post("/api/evaluate", (req, res) => {
-    const { contestant_id, judge_id, scores } = req.body; // scores: [ { juz_index, criteria_id, score } ]
+    const { contestant_id, judge_id, judge_name, judge_phone, scores } = req.body; // scores: [ { juz_index, criteria_id, score } ]
 
-    const insert = db.prepare("INSERT INTO evaluations (contestant_id, judge_id, criteria_id, juz_index, score) VALUES (?, ?, ?, ?, ?)");
+    const insert = db.prepare("INSERT INTO evaluations (contestant_id, judge_id, criteria_id, juz_index, score, judge_name, judge_phone) VALUES (?, ?, ?, ?, ?, ?, ?)");
     
     const transaction = db.transaction((evals) => {
       for (const item of evals) {
-        insert.run(contestant_id, judge_id, item.criteria_id, item.juz_index, item.score);
+        insert.run(contestant_id, judge_id, item.criteria_id, item.juz_index, item.score, judge_name, judge_phone);
       }
     });
 
@@ -230,13 +239,22 @@ async function startServer() {
 
     const results = contestants.map(c => {
       const evaluations = db.prepare(`
-        SELECT judge_id, juz_index, SUM(score) as total_score
+        SELECT judge_id, juz_index, SUM(score) as total_score, MAX(judge_name) as judge_name, MAX(judge_phone) as judge_phone
         FROM evaluations
         WHERE contestant_id = ?
         GROUP BY judge_id, juz_index
       `).all(c.id) as any[];
 
       const judgeIds = [...new Set(evaluations.map(e => e.judge_id))];
+      const judgeInfo = judgeIds.map(id => {
+        const ev = evaluations.find(e => e.judge_id === id);
+        return {
+          id,
+          name: ev?.judge_name || `مقيم ${id}`,
+          phone: ev?.judge_phone || "-"
+        };
+      });
+
       const juzDetails = [];
       let totalSumOfAverages = 0;
 
@@ -265,6 +283,7 @@ async function startServer() {
       return {
         ...c,
         judge_count: judgeIds.length,
+        judge_info: judgeInfo,
         juz_details: juzDetails,
         average_score: c.juz_count > 0 ? totalSumOfAverages / c.juz_count : 0
       };

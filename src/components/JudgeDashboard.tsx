@@ -15,6 +15,8 @@ export default function JudgeDashboard() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [judgeId, setJudgeId] = useState<string>("1");
+  const [judgeName, setJudgeName] = useState<string>("");
+  const [judgePhone, setJudgePhone] = useState<string>("");
   const [genderFilter, setGenderFilter] = useState<string>("all");
 
   // Specific scoring state per Juz
@@ -121,6 +123,11 @@ export default function JudgeDashboard() {
     : 0;
 
   const handleSubmitEvaluation = async () => {
+    if (!judgeId || !judgeName || !judgePhone) {
+      toast.error("يرجى إكمال بيانات المقيم (الرقم، الاسم، الهاتف)");
+      return;
+    }
+
     setSubmitting(true);
     
     // Map the calculated scores to the criteria for EACH Juz
@@ -146,6 +153,8 @@ export default function JudgeDashboard() {
         body: JSON.stringify({
           contestant_id: selectedContestant.id,
           judge_id: parseInt(judgeId),
+          judge_name: judgeName,
+          judge_phone: judgePhone,
           scores: allScores,
         }),
       });
@@ -244,6 +253,40 @@ export default function JudgeDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="p-3 sm:p-8 space-y-8 sm:space-y-12">
+                {/* Judge Info at the Top */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                  <div>
+                    <Label className="text-amber-900 font-bold text-xs">رقم المقيم</Label>
+                    <Select value={judgeId} onValueChange={setJudgeId}>
+                      <SelectTrigger className="mt-1 bg-white border-amber-200 h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">المقيم الأول</SelectItem>
+                        <SelectItem value="2">المقيم الثاني</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-amber-900 font-bold text-xs">اسم المقيم</Label>
+                    <Input 
+                      placeholder="اسم المقيم" 
+                      value={judgeName} 
+                      onChange={(e) => setJudgeName(e.target.value)}
+                      className="mt-1 bg-white border-amber-200 h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-amber-900 font-bold text-xs">رقم الهاتف</Label>
+                    <Input 
+                      placeholder="رقم الهاتف" 
+                      value={judgePhone} 
+                      onChange={(e) => setJudgePhone(e.target.value)}
+                      className="mt-1 bg-white border-amber-200 h-10"
+                    />
+                  </div>
+                </div>
+
                 {/* Overall Summary */}
                 <div className="bg-emerald-50 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-emerald-100 flex items-center justify-between">
                   <div>
@@ -349,21 +392,6 @@ export default function JudgeDashboard() {
                   </div>
                 ))}
 
-                <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-amber-50 rounded-xl sm:rounded-2xl border border-amber-100">
-                  <Star className="w-5 h-5 text-amber-600 hidden sm:block" />
-                  <div className="flex-1">
-                    <Label className="text-amber-900 font-bold text-sm">رقم المقيم</Label>
-                    <Select value={judgeId} onValueChange={setJudgeId}>
-                      <SelectTrigger className="mt-1 bg-white border-amber-200 h-9 sm:h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">المقيم الأول</SelectItem>
-                        <SelectItem value="2">المقيم الثاني</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
               </CardContent>
               <CardFooter className="bg-slate-50 border-t border-slate-100 py-4 sm:py-6">
                 <Button
