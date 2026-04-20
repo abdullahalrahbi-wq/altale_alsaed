@@ -325,31 +325,31 @@ export default function JudgeDashboard() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200 overflow-hidden">
+                          <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200 overflow-hidden">
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-10 w-10 text-emerald-600 hover:bg-emerald-100 disabled:opacity-30"
-                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, -1)}
-                              disabled={(juzScores[juzIdx]?.positionErrors[posIdx] || 0) <= 0}
+                              className="h-14 w-14 text-red-600 hover:bg-red-100 flex-shrink-0"
+                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, 1)}
                             >
-                              <Plus className="w-6 h-6" />
+                              <Minus className="w-8 h-8" />
                             </Button>
                             
                             <div className="flex flex-col items-center">
-                              <span className="text-2xl font-black text-slate-900 leading-none">
+                              <span className="text-3xl font-black text-slate-900 leading-none">
                                 {juzScores[juzIdx]?.positionErrors[posIdx] || 0}
                               </span>
-                              <span className="text-[9px] text-slate-500 font-bold uppercase mt-1">مقدار النقص</span>
+                              <span className="text-[10px] text-slate-500 font-bold uppercase mt-2">مقدار النقص</span>
                             </div>
 
                             <Button 
                               variant="ghost" 
                               size="icon" 
-                              className="h-10 w-10 text-red-600 hover:bg-red-100"
-                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, 1)}
+                              className="h-14 w-14 text-emerald-600 hover:bg-emerald-100 disabled:opacity-20 flex-shrink-0"
+                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, -1)}
+                              disabled={(juzScores[juzIdx]?.positionErrors[posIdx] || 0) <= 0}
                             >
-                              <Minus className="w-6 h-6" />
+                              <Plus className="w-8 h-8" />
                             </Button>
                           </div>
                         </div>
