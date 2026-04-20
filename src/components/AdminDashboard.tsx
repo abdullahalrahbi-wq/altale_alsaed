@@ -15,12 +15,13 @@ export default function AdminDashboard() {
   const [results, setResults] = useState<any[]>([]);
   const [competition, setCompetition] = useState<any>(null);
   const [allCompetitions, setAllCompetitions] = useState<any[]>([]);
+  const [globalSettings, setGlobalSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [editingCompId, setEditingCompId] = useState<number | null>(null);
   const [editingContestantId, setEditingContestantId] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
   const [showContestantDeleteConfirm, setShowContestantDeleteConfirm] = useState<number | null>(null);
-  const [editData, setEditData] = useState({ name: "", year: 0 });
+  const [editData, setEditData] = useState({ name: "", year: 0, logo_url: "" });
   const [editContestantData, setEditContestantData] = useState({
     name: "",
     civil_id: "",
@@ -50,7 +51,14 @@ export default function AdminDashboard() {
     fetchResults();
     fetchActiveCompetition();
     fetchAllCompetitions();
+    fetchGlobalSettings();
   }, []);
+
+  const fetchGlobalSettings = () => {
+    fetch("/api/settings")
+      .then(res => res.json())
+      .then(data => setGlobalSettings(data));
+  };
 
   const fetchActiveCompetition = () => {
     fetch("/api/competition/active")
@@ -143,7 +151,7 @@ export default function AdminDashboard() {
 
   const handleStartEdit = (comp: any) => {
     setEditingCompId(comp.id);
-    setEditData({ name: comp.name, year: comp.year });
+    setEditData({ name: comp.name, year: comp.year, logo_url: comp.logo_url || "" });
   };
 
   const handleSaveEdit = async () => {
@@ -239,6 +247,31 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("logo", file);
+
+    try {
+      const res = await fetch("/api/admin/settings/logo", {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGlobalSettings({ ...globalSettings, site_logo: data.logoUrl });
+        toast.success("تم تحديث الشعار بنجاح! يرجى تحديث الصفحة لرؤية التغييرات في كل مكان.");
+        // We trigger a global event or just let them refresh
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        toast.error("فشل رفع الشعار");
+      }
+    } catch (error) {
+      toast.error("خطأ في الاتصال بالخادم");
+    }
+  };
   const chartData = results
     .filter(r => r.average_score !== null)
     .slice(0, 10)
@@ -262,6 +295,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="setup" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
             إعداد المسابقة
+          </TabsTrigger>
+          <TabsTrigger value="global" className="flex items-center gap-2">
+            <Settings className="w-4 h-4 text-emerald-600" />
+            إعدادات المنصة
           </TabsTrigger>
         </TabsList>
 
@@ -551,6 +588,14 @@ export default function AdminDashboard() {
                                 onChange={(e) => setEditData({ ...editData, year: parseInt(e.target.value) })}
                               />
                             </div>
+                            <div className="space-y-2">
+                              <Label>رابط الشعار (URL)</Label>
+                              <Input 
+                                placeholder="انسخ رابط الشعار هنا..."
+                                value={editData.logo_url} 
+                                onChange={(e) => setEditData({ ...editData, logo_url: e.target.value })}
+                              />
+                            </div>
                             <div className="flex gap-2">
                               <Button onClick={handleSaveEdit} className="bg-emerald-600">
                                 <Save className="w-4 h-4 ml-2" />
@@ -837,6 +882,60 @@ export default function AdminDashboard() {
               <Button onClick={handleCreateCompetition} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 text-lg font-bold">
                 حفظ وتفعيل المسابقة
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="global" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>الإعدادات العامة للمنصة</CardTitle>
+              <CardDescription>تحكم في الشعار والاسم الرسمي للمنصة</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8">
+              <div className="flex flex-col md:flex-row items-center gap-8 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
+                <div className="relative group">
+                  <div className="w-48 h-48 bg-white rounded-[2rem] shadow-xl border border-slate-200 flex items-center justify-center overflow-hidden">
+                    {globalSettings.site_logo ? (
+                      <img src={globalSettings.site_logo} alt="شعار المنصة الحالي" className="w-full h-full object-contain p-4" />
+                    ) : (
+                      <div className="text-slate-300 text-center p-4">
+                        <Settings className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                        <p className="text-xs">لا يوجد شعار مخصص</p>
+                      </div>
+                    )}
+                  </div>
+                  <Label 
+                    htmlFor="logo-upload" 
+                    className="absolute inset-0 bg-black/40 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-[2rem]"
+                  >
+                    <Plus className="w-8 h-8 mb-2" />
+                    <span className="text-sm font-bold">تغيير الشعار</span>
+                  </Label>
+                  <input 
+                    id="logo-upload" 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleLogoUpload}
+                  />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <h3 className="text-2xl font-black text-slate-900">شعار المنصة الرسمي</h3>
+                  <p className="text-slate-500 leading-relaxed max-w-md">
+                    هذا الشعار سيظهر في أعلى جميع الصفحات (بوابة التسجيل، بوابة المقيمين، الصفحة الرئيسية). 
+                    يفضل استخدام صورة بخلفية شفافة (PNG) وبقياسات مربعة.
+                  </p>
+                  <div className="flex gap-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                      className="rounded-xl"
+                    >
+                      تحميل صورة جديدة
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

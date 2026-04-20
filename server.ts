@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import Database from "better-sqlite3";
+import multer from "multer";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,13 +14,22 @@ const db = new Database(dbPath);
 
 // Initialize Database
 db.exec(`
+  CREATE TABLE IF NOT EXISTS global_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
+
+  INSERT OR IGNORE INTO global_settings (key, value) VALUES ('site_logo', null);
+  INSERT OR IGNORE INTO global_settings (key, value) VALUES ('site_name', 'مدرسة الطالع السعيد لتدريس القرآن الكريم');
+
   CREATE TABLE IF NOT EXISTS competitions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     year INTEGER NOT NULL,
     active INTEGER DEFAULT 1,
     registration_code TEXT,
-    judging_code TEXT
+    judging_code TEXT,
+    logo_url TEXT
   );
 
   CREATE TABLE IF NOT EXISTS levels (
@@ -89,6 +99,9 @@ try {
   db.prepare("ALTER TABLE competitions ADD COLUMN judging_code TEXT").run();
 } catch (e) {}
 try {
+  db.prepare("ALTER TABLE competitions ADD COLUMN logo_url TEXT").run();
+} catch (e) {}
+try {
   db.prepare("ALTER TABLE levels ADD COLUMN juz_count INTEGER DEFAULT 1").run();
 } catch (e) {}
 try {
@@ -118,7 +131,54 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Logo upload setup
+  const uploadDir = path.join(process.cwd(), "public/uploads");
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname);
+      cb(null, `logo_${Date.now()}${ext}`);
+    }
+  });
+
+  const upload = multer({ storage });
+
+  // Serve uploads as static files
+  app.use("/uploads", express.static(uploadDir));
+
   // --- API Routes ---
+
+  // Global settings
+  app.get("/api/settings", (req, res) => {
+    const settings = db.prepare("SELECT * FROM global_settings").all() as any[];
+    const settingsMap = settings.reduce((acc, curr) => {
+      acc[curr.key] = curr.value;
+      return acc;
+    }, {});
+    res.json(settingsMap);
+  });
+
+  app.post("/api/admin/settings/logo", upload.single("logo"), (req: any, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    const logoUrl = `/uploads/${req.file.filename}`;
+    db.prepare("UPDATE global_settings SET value = ? WHERE key = ?").run(logoUrl, "site_logo");
+    res.json({ success: true, logoUrl });
+  });
+
+  // Update logo url
+  app.post("/api/competition/logo", (req, res) => {
+    const { id, logo_url } = req.body;
+    db.prepare("UPDATE competitions SET logo_url = ? WHERE id = ?").run(logo_url, id);
+    res.json({ success: true });
+  });
 
   // Get active competition
   app.get("/api/competition/active", (req, res) => {
@@ -371,9 +431,9 @@ async function startServer() {
 
   // Update competition
   app.post("/api/admin/competition/update", (req, res) => {
-    const { id, name, year } = req.body;
+    const { id, name, year, logo_url } = req.body;
     try {
-      db.prepare("UPDATE competitions SET name = ?, year = ? WHERE id = ?").run(name, year, id);
+      db.prepare("UPDATE competitions SET name = ?, year = ?, logo_url = ? WHERE id = ?").run(name, year, logo_url, id);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

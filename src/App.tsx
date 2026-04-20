@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import RegistrationForm from "./components/RegistrationForm";
 import JudgeDashboard from "./components/JudgeDashboard";
 import AdminDashboard from "./components/AdminDashboard";
-import { BookOpen, Users, Settings, Award, AlertTriangle } from "lucide-react";
+import Logo from "./components/Logo";
+import { Users, Settings, Award, AlertTriangle } from "lucide-react";
 
 interface Props {
   children: React.ReactNode;
@@ -59,6 +60,7 @@ class ErrorBoundary extends Component<Props, State> {
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
   const [competition, setCompetition] = useState<any>(null);
+  const [settings, setSettings] = useState<Record<string, any>>({});
   const [unlockedTabs, setUnlockedTabs] = useState<Record<string, boolean>>({ home: true });
   const [accessCode, setAccessCode] = useState("");
   const [showCodePrompt, setShowCodePrompt] = useState<string | null>(null);
@@ -67,6 +69,10 @@ export default function App() {
     fetch("/api/competition/active")
       .then((res) => res.json())
       .then((data) => setCompetition(data));
+
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((data) => setSettings(data));
   }, []);
 
   const handleTabChange = (value: string) => {
@@ -128,16 +134,27 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-20 items-center">
               <div className="flex items-center gap-4">
-                <div className="bg-white p-1 rounded-2xl shadow-md border border-slate-100 overflow-hidden">
-                  <img 
-                    src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
-                    alt="شعار المدرسة" 
-                    className="w-14 h-14 object-contain"
-                    referrerPolicy="no-referrer"
-                  />
+                <div className="bg-white p-1.5 rounded-2xl shadow-md border border-slate-100 overflow-hidden flex items-center justify-center">
+                  {settings?.site_logo ? (
+                    <img 
+                      src={settings.site_logo} 
+                      alt="شعار مدرسة الطالع السعيد" 
+                      className="w-12 h-12 object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : competition?.logo_url ? (
+                    <img 
+                      src={competition.logo_url} 
+                      alt="شعار المدرسة" 
+                      className="w-12 h-12 object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Logo className="w-12 h-12" />
+                  )}
                 </div>
                 <div>
-                  <h1 className="text-2xl font-black text-slate-900 tracking-tight">مدرسة الطالع السعيد لتدريس القرآن الكريم</h1>
+                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">مدرسة الطالع السعيد لتدريس القرآن الكريم</h1>
                   <p className="text-xs text-emerald-700 font-bold uppercase tracking-widest">مسابقة حفظ القرآن الكريم</p>
                 </div>
               </div>
@@ -180,13 +197,24 @@ export default function App() {
           {showCodePrompt ? (
             <div className="max-w-md mx-auto mt-20">
               <div className="bg-white p-8 rounded-[2rem] shadow-2xl shadow-slate-200 border border-slate-100 text-center space-y-6">
-                <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mx-auto shadow-inner border border-slate-50">
-                  <img 
-                    src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
-                    alt="شعار المدرسة" 
-                    className="w-20 h-20 object-contain"
-                    referrerPolicy="no-referrer"
-                  />
+                <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mx-auto shadow-inner border border-slate-100 p-2">
+                  {settings?.site_logo ? (
+                    <img 
+                      src={settings.site_logo} 
+                      alt="شعار مدرسة الطالع السعيد" 
+                      className="w-full h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : competition?.logo_url ? (
+                    <img 
+                      src={competition.logo_url} 
+                      alt="شعار المدرسة" 
+                      className="w-full h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <Logo className="w-full h-full" />
+                  )}
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">منطقة محمية</h2>
@@ -219,16 +247,27 @@ export default function App() {
                   {/* Hero Section */}
                   <div className="text-center space-y-8 py-6">
                     <div className="flex justify-center">
-                      <div className="bg-white p-4 rounded-[2.5rem] shadow-2xl border border-slate-100 animate-in zoom-in-50 duration-500">
-                        <img 
-                          src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
-                          alt="شعار المدرسة كبير" 
-                          className="w-48 h-48 md:w-64 md:h-64 object-contain"
-                          referrerPolicy="no-referrer"
-                        />
+                      <div className="bg-white p-6 rounded-[3rem] shadow-2xl border border-slate-100 animate-in zoom-in-50 duration-500 flex items-center justify-center">
+                        {settings?.site_logo ? (
+                          <img 
+                            src={settings.site_logo} 
+                            alt="شعار مدرسة الطالع السعيد" 
+                            className="w-40 h-40 md:w-56 md:h-56 object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : competition?.logo_url ? (
+                          <img 
+                            src={competition.logo_url} 
+                            alt="شعار المدرسة كبير" 
+                            className="w-40 h-40 md:w-56 md:h-56 object-contain"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <Logo className="w-40 h-40 md:w-56 md:h-56" />
+                        )}
                       </div>
                     </div>
-                    <h2 className="text-6xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tighter">
+                    <h2 className="text-5xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tighter">
                       ورتل القرآن <br /> <span className="text-emerald-600">ترتيلاً</span>
                     </h2>
                     <p className="text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
@@ -288,12 +327,23 @@ export default function App() {
         <footer className="bg-white border-t border-slate-200 py-12 mt-20">
           <div className="max-w-7xl mx-auto px-4 text-center space-y-6">
             <div className="flex justify-center flex-col items-center gap-4">
-              <img 
-                src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
-                alt="شعار المدرسة فوتر" 
-                className="w-20 h-20 object-contain opacity-60 grayscale hover:grayscale-0 transition-all"
-                referrerPolicy="no-referrer"
-              />
+              {settings?.site_logo ? (
+                <img 
+                  src={settings.site_logo} 
+                  alt="شعار مدرسة الطالع السعيد" 
+                  className="w-16 h-16 object-contain opacity-60 grayscale hover:grayscale-0 transition-all cursor-help"
+                  referrerPolicy="no-referrer"
+                />
+              ) : competition?.logo_url ? (
+                <img 
+                  src={competition.logo_url} 
+                  alt="شعار المدرسة فوتر" 
+                  className="w-16 h-16 object-contain opacity-60 grayscale hover:grayscale-0 transition-all cursor-help"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <Logo className="w-16 h-16 opacity-60 grayscale hover:grayscale-0 transition-all cursor-help" />
+              )}
               <div className="flex justify-center gap-6 text-slate-300">
                 <Award className="w-5 h-5" />
                 <Users className="w-5 h-5" />
