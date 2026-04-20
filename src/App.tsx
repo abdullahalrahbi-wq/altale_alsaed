@@ -128,8 +128,13 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-20 items-center">
               <div className="flex items-center gap-4">
-                <div className="bg-emerald-700 p-3 rounded-2xl shadow-lg shadow-emerald-200/50 rotate-3">
-                  <BookOpen className="w-8 h-8 text-white" />
+                <div className="bg-white p-1 rounded-2xl shadow-md border border-slate-100 overflow-hidden">
+                  <img 
+                    src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
+                    alt="شعار المدرسة" 
+                    className="w-14 h-14 object-contain"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
                 <div>
                   <h1 className="text-2xl font-black text-slate-900 tracking-tight">مدرسة الطالع السعيد لتدريس القرآن الكريم</h1>
@@ -175,8 +180,13 @@ export default function App() {
           {showCodePrompt ? (
             <div className="max-w-md mx-auto mt-20">
               <div className="bg-white p-8 rounded-[2rem] shadow-2xl shadow-slate-200 border border-slate-100 text-center space-y-6">
-                <div className="w-20 h-20 bg-amber-100 rounded-3xl flex items-center justify-center mx-auto rotate-6">
-                  <Settings className="w-10 h-10 text-amber-600" />
+                <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mx-auto shadow-inner border border-slate-50">
+                  <img 
+                    src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
+                    alt="شعار المدرسة" 
+                    className="w-20 h-20 object-contain"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900">منطقة محمية</h2>
@@ -207,7 +217,17 @@ export default function App() {
               {activeTab === "home" && (
                 <div className="space-y-16">
                   {/* Hero Section */}
-                  <div className="text-center space-y-6 py-12">
+                  <div className="text-center space-y-8 py-6">
+                    <div className="flex justify-center">
+                      <div className="bg-white p-4 rounded-[2.5rem] shadow-2xl border border-slate-100 animate-in zoom-in-50 duration-500">
+                        <img 
+                          src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
+                          alt="شعار المدرسة كبير" 
+                          className="w-48 h-48 md:w-64 md:h-64 object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    </div>
                     <h2 className="text-6xl md:text-8xl font-black text-slate-900 leading-[0.9] tracking-tighter">
                       ورتل القرآن <br /> <span className="text-emerald-600">ترتيلاً</span>
                     </h2>
@@ -266,13 +286,20 @@ export default function App() {
         </main>
 
         <footer className="bg-white border-t border-slate-200 py-12 mt-20">
-          <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
-            <div className="flex justify-center gap-6 text-slate-400">
-              <BookOpen className="w-6 h-6" />
-              <Award className="w-6 h-6" />
-              <Users className="w-6 h-6" />
+          <div className="max-w-7xl mx-auto px-4 text-center space-y-6">
+            <div className="flex justify-center flex-col items-center gap-4">
+              <img 
+                src="https://raw.githubusercontent.com/altale-alsaed/logos/main/school_logo.png" 
+                alt="شعار المدرسة فوتر" 
+                className="w-20 h-20 object-contain opacity-60 grayscale hover:grayscale-0 transition-all"
+                referrerPolicy="no-referrer"
+              />
+              <div className="flex justify-center gap-6 text-slate-300">
+                <Award className="w-5 h-5" />
+                <Users className="w-5 h-5" />
+              </div>
             </div>
-            <p className="text-slate-500 font-medium">جميع الحقوق محفوظة &copy; {new Date().getFullYear()} نظام مسابقة القرآن الكريم</p>
+            <p className="text-slate-500 font-medium tracking-tight">جميع الحقوق محفوظة &copy; {new Date().getFullYear()} مدرسة الطالع السعيد لتدريس القرآن الكريم</p>
           </div>
         </footer>
       </div>
