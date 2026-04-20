@@ -29,6 +29,7 @@ db.exec(`
     description TEXT,
     rank INTEGER DEFAULT 0,
     juz_count INTEGER DEFAULT 1,
+    positions_count INTEGER DEFAULT 5,
     pass_threshold REAL DEFAULT 70.0,
     FOREIGN KEY(competition_id) REFERENCES competitions(id)
   );
@@ -89,6 +90,9 @@ try {
 } catch (e) {}
 try {
   db.prepare("ALTER TABLE levels ADD COLUMN juz_count INTEGER DEFAULT 1").run();
+} catch (e) {}
+try {
+  db.prepare("ALTER TABLE levels ADD COLUMN positions_count INTEGER DEFAULT 5").run();
 } catch (e) {}
 try {
   db.prepare("ALTER TABLE evaluations ADD COLUMN juz_index INTEGER DEFAULT 0").run();
@@ -185,7 +189,7 @@ async function startServer() {
   app.get("/api/contestants", (req, res) => {
     const judgeId = req.query.judge_id || 0;
     const contestants = db.prepare(`
-      SELECT c.*, l.name as level_name, l.juz_count,
+      SELECT c.*, l.name as level_name, l.juz_count, l.positions_count,
         (SELECT COUNT(DISTINCT judge_id) FROM evaluations WHERE contestant_id = c.id) as judge_count,
         (SELECT COUNT(*) FROM evaluations WHERE contestant_id = c.id AND judge_id = ?) as already_judged_by_me
       FROM contestants c 
@@ -232,7 +236,7 @@ async function startServer() {
   app.get("/api/results", (req, res) => {
     // Complex calculation: Detailed scores per judge and juz
     const contestants = db.prepare(`
-      SELECT c.*, l.name as level_name, l.juz_count
+      SELECT c.*, l.name as level_name, l.juz_count, l.positions_count
       FROM contestants c
       JOIN levels l ON c.level_id = l.id
     `).all() as any[];
@@ -295,7 +299,7 @@ async function startServer() {
   // Get my registrations (recent)
   app.get("/api/my-registrations", (req, res) => {
     const registrations = db.prepare(`
-      SELECT c.*, l.name as level_name
+      SELECT c.*, l.name as level_name, l.positions_count
       FROM contestants c
       JOIN levels l ON c.level_id = l.id
       ORDER BY c.created_at DESC
@@ -320,7 +324,7 @@ async function startServer() {
       const compId = compResult.lastInsertRowid;
 
       for (const level of levels) {
-        const levelResult = db.prepare("INSERT INTO levels (competition_id, name, description, rank, juz_count) VALUES (?, ?, ?, ?, ?)").run(compId, level.name, level.description, level.rank || 0, level.juz_count || 1);
+        const levelResult = db.prepare("INSERT INTO levels (competition_id, name, description, rank, juz_count, positions_count) VALUES (?, ?, ?, ?, ?, ?)").run(compId, level.name, level.description, level.rank || 0, level.juz_count || 1, level.positions_count || 5);
         const levelId = levelResult.lastInsertRowid;
 
         for (const crit of level.criteria) {

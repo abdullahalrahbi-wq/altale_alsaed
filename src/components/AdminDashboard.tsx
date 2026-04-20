@@ -776,6 +776,19 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="space-y-2 col-span-1">
+                          <Label>عدد المواضع</Label>
+                          <Input 
+                            type="number"
+                            min="1"
+                            value={(level as any).positions_count || 5} 
+                            onChange={e => {
+                              const levels = [...newComp.levels];
+                              (levels[lIdx] as any).positions_count = parseInt(e.target.value);
+                              setNewComp({...newComp, levels});
+                            }} 
+                          />
+                        </div>
+                        <div className="space-y-2 col-span-1">
                           <Label>الرتبة (1 للأقل)</Label>
                           <Input 
                             type="number"

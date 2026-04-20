@@ -52,6 +52,7 @@ export default function JudgeDashboard() {
     
     // Use juz_count from contestant object
     const juzCount = contestant.juz_count || 1;
+    const positionsCount = contestant.positions_count || 5;
     
     // Initialize scoring state for each Juz
     const initialScores: Record<number, any> = {};
@@ -59,39 +60,29 @@ export default function JudgeDashboard() {
       initialScores[i] = {
         deductions: 0,
         tajweedScore: 5,
-        positionErrors: [0, 0, 0, 0, 0]
+        positionErrors: Array(positionsCount).fill(0)
       };
     }
     setJuzScores(initialScores);
   };
 
-  const addDeduction = (juzIdx: number, posIdx: number, amount: number) => {
+  const adjustPositionDeduction = (juzIdx: number, posIdx: number, amount: number) => {
     setJuzScores(prev => {
       const current = prev[juzIdx];
       const newErrors = [...current.positionErrors];
-      newErrors[posIdx] += amount;
+      
+      // amount is +1 for adding a mistake, -1 for undoing it
+      const currentDeduction = newErrors[posIdx];
+      const newDeduction = Math.max(0, currentDeduction + amount);
+      const diff = newDeduction - currentDeduction;
+      
+      newErrors[posIdx] = newDeduction;
+      
       return {
         ...prev,
         [juzIdx]: {
           ...current,
-          deductions: current.deductions + amount,
-          positionErrors: newErrors
-        }
-      };
-    });
-  };
-
-  const resetPosition = (juzIdx: number, posIdx: number) => {
-    setJuzScores(prev => {
-      const current = prev[juzIdx];
-      const newErrors = [...current.positionErrors];
-      const errorAmount = newErrors[posIdx];
-      newErrors[posIdx] = 0;
-      return {
-        ...prev,
-        [juzIdx]: {
-          ...current,
-          deductions: current.deductions - errorAmount,
+          deductions: current.deductions + diff,
           positionErrors: newErrors
         }
       };
@@ -322,38 +313,43 @@ export default function JudgeDashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                      {[0, 1, 2, 3, 4].map((posIdx) => (
+                      {Array.from({ length: selectedContestant.positions_count || 5 }).map((_, posIdx) => (
                         <div key={posIdx} className="p-3 sm:p-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl shadow-sm space-y-3 sm:space-y-4">
                           <div className="flex justify-between items-center">
                             <span className="font-bold text-sm sm:text-base text-slate-700">الموضع {posIdx + 1}</span>
                             <div className="flex items-center gap-2">
                               {(juzScores[juzIdx]?.positionErrors[posIdx] || 0) > 0 && (
-                                <div className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">-{juzScores[juzIdx].positionErrors[posIdx]}</div>
+                                <div className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                  تنبيه: يوجد نقص في هذا الموضع
+                                </div>
                               )}
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 text-slate-400 hover:text-amber-600"
-                                onClick={() => resetPosition(juzIdx, posIdx)}
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                              </Button>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200 overflow-hidden">
                             <Button 
-                              variant="outline" 
-                              className="h-10 sm:h-12 border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 text-[10px] sm:text-xs px-1"
-                              onClick={() => addDeduction(juzIdx, posIdx, 1)}
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 text-emerald-600 hover:bg-emerald-100 disabled:opacity-30"
+                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, -1)}
+                              disabled={(juzScores[juzIdx]?.positionErrors[posIdx] || 0) <= 0}
                             >
-                              خطأ حركات (-1)
+                              <Plus className="w-6 h-6" />
                             </Button>
+                            
+                            <div className="flex flex-col items-center">
+                              <span className="text-2xl font-black text-slate-900 leading-none">
+                                {juzScores[juzIdx]?.positionErrors[posIdx] || 0}
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-bold uppercase mt-1">مقدار النقص</span>
+                            </div>
+
                             <Button 
-                              variant="outline" 
-                              className="h-10 sm:h-12 border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 text-[10px] sm:text-xs px-1"
-                              onClick={() => addDeduction(juzIdx, posIdx, 2)}
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 text-red-600 hover:bg-red-100"
+                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, 1)}
                             >
-                              نسيان/قلب (-2)
+                              <Minus className="w-6 h-6" />
                             </Button>
                           </div>
                         </div>
