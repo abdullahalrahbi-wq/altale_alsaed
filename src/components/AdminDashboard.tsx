@@ -225,97 +225,185 @@ export default function AdminDashboard() {
   };
 
   const exportToExcel = () => {
-    // Collect all data and determine max Juz count for columns
-    const maxJuzCount = Math.max(...results.map(r => r.juz_details?.length || 0), 0);
-    
-    let html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
-        <style>
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border: 1px solid #000; padding: 8px; text-align: center; }
-          th { background-color: #f2f2f2; font-weight: bold; }
-          .pass { background-color: #c6efce; color: #006100; }
-          .fail { background-color: #ffc7ce; color: #9c0006; }
-          .header-main { background-color: #d9ead3; }
-        </style>
-      </head>
-      <body dir="rtl">
-        <h3>نتائج مسابقة حفظ القرآن الكريم - ${competition?.name || ""}</h3>
-        <table>
-          <thead>
-            <tr class="header-main">
-              <th>الاسم</th>
-              <th>رقم الهاتف</th>
-              <th>البلد/الولاية</th>
-              <th>الرقم المدني</th>
-              <th>الجنس</th>
-              <th>المستوى</th>
-              <th>المقيمين أرقام هواتفهم</th>
-    `;
+    // Group results by level
+    const resultsByLevel = results.reduce((acc: Record<string, any[]>, r) => {
+      const level = r.level_name || "غير محدد";
+      if (!acc[level]) acc[level] = [];
+      acc[level].push(r);
+      return acc;
+    }, {});
 
-    // Add Juz columns
-    for (let i = 1; i <= maxJuzCount; i++) {
-      html += `<th>الجزء ${i}</th>`;
-    }
+    const escape = (str: string | number | null | undefined) => {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+    };
 
-    html += `
-              <th>الدرجة النهائية</th>
-              <th>الأداء (الإجازة)</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Bottom" ss:Horizontal="Center"/>
+   <Borders/>
+   <Font ss:FontName="Arial" x:CharSet="178" ss:Size="11" ss:Color="#000000"/>
+   <Interior/>
+   <NumberFormat/>
+   <Protection/>
+  </Style>
+  <Style ss:ID="header">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Arial" x:CharSet="178" ss:Size="11" ss:Color="#000000" ss:Bold="1"/>
+   <Interior ss:Color="#D9EAD3" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="pass">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Interior ss:Color="#C6EFCE" ss:Pattern="Solid"/>
+   <Font ss:FontName="Arial" x:CharSet="178" ss:Color="#006100" ss:Bold="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="fail">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Interior ss:Color="#FFC7CE" ss:Pattern="Solid"/>
+   <Font ss:FontName="Arial" x:CharSet="178" ss:Color="#9C0006" ss:Bold="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="cell">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+   </Borders>
+  </Style>
+ </Styles>
+`;
 
-    results.forEach(r => {
-      const judges = (r.judge_info || []).map((j: any) => `${j.name} (${j.phone})`).join(" | ");
-      const finalScore = r.average_score || 0;
-      const status = finalScore >= 75 ? "مجاز" : "غير مجاز";
-      const statusClass = finalScore >= 75 ? "pass" : "fail";
+    (Object.entries(resultsByLevel) as [string, any[]][]).forEach(([levelName, levelResults]) => {
+      const maxJuzCount = Math.max(...levelResults.map(r => r.juz_details?.length || 0), 0);
+      
+      xml += ` <Worksheet ss:Name="${escape(levelName.substring(0, 31))}">
+  <Table>
+   <Row ss:Height="25">
+    <Cell ss:StyleID="header"><Data ss:Type="String">الاسم</Data></Cell>
+    <Cell ss:StyleID="header"><Data ss:Type="String">رقم الهاتف</Data></Cell>
+    <Cell ss:StyleID="header"><Data ss:Type="String">البلد/الولاية</Data></Cell>
+    <Cell ss:StyleID="header"><Data ss:Type="String">الرقم المدني</Data></Cell>
+    <Cell ss:StyleID="header"><Data ss:Type="String">الجنس</Data></Cell>
+    <Cell ss:StyleID="header"><Data ss:Type="String">المستوى</Data></Cell>
+    <Cell ss:StyleID="header"><Data ss:Type="String">المقيمين أرقام هواتفهم</Data></Cell>`;
 
-      html += `
-        <tr>
-          <td>${r.name}</td>
-          <td dir="ltr">${r.phone || "-"}</td>
-          <td>${r.town || "-"}</td>
-          <td dir="ltr">'${r.civil_id}</td>
-          <td>${r.gender === 'male' ? 'ذكر' : 'أنثى'}</td>
-          <td>${r.level_name}</td>
-          <td>${judges || "-"}</td>
-      `;
-
-      // Juz Scores
-      for (let i = 0; i < maxJuzCount; i++) {
-        const juz = r.juz_details?.[i];
-        if (juz) {
-          const score = juz.average || 0;
-          const juzClass = score >= 75 ? "pass" : "fail";
-          html += `<td class="${juzClass}">${score.toFixed(1)}</td>`;
-        } else {
-          html += `<td>-</td>`;
-        }
+      for (let i = 1; i <= maxJuzCount; i++) {
+        xml += `\n    <Cell ss:StyleID="header"><Data ss:Type="String">الجزء ${i}</Data></Cell>`;
       }
 
-      html += `
-          <td class="${statusClass} font-bold">${finalScore.toFixed(2)}</td>
-          <td class="${statusClass} font-bold">${status}</td>
-        </tr>
-      `;
+      xml += `
+    <Cell ss:StyleID="header"><Data ss:Type="String">الدرجة النهائية</Data></Cell>
+    <Cell ss:StyleID="header"><Data ss:Type="String">الأداء (الإجازة)</Data></Cell>
+   </Row>`;
+
+      levelResults.forEach(r => {
+        const judges = (r.judge_info || []).map((j: any) => `${j.name} (${j.phone})`).join(" | ");
+        const finalScore = r.average_score || 0;
+        const passedJuzCount = r.juz_details?.filter((j: any) => j.average >= 75).length || 0;
+        const totalJuzCount = r.juz_count || 0;
+
+        let status = "";
+        let statusStyle = "fail";
+
+        if (finalScore >= 75) {
+          if (passedJuzCount === totalJuzCount) {
+            status = "مجاز";
+            statusStyle = "pass";
+          } else if (passedJuzCount > 0) {
+            // Find the highest level that matches or is below the passed juz count
+            // We exclude the current level to ensure it's a "downgrade" as requested
+            const targetLevel = competition?.levels
+              ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
+              ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
+            
+            if (targetLevel) {
+              status = `ينزل إلى (${targetLevel.name})`;
+            } else {
+              status = `مجاز جزئياً (${passedJuzCount} أجزاء)`;
+            }
+            statusStyle = "pass";
+          } else {
+            status = "غير مجاز (لم ينجح في أي جزء)";
+            statusStyle = "fail";
+          }
+        } else {
+          status = "غير مجاز";
+          statusStyle = "fail";
+        }
+
+        xml += `
+   <Row ss:Height="20">
+    <Cell ss:StyleID="cell"><Data ss:Type="String">${escape(r.name)}</Data></Cell>
+    <Cell ss:StyleID="cell"><Data ss:Type="String">${escape(r.phone || "-")}</Data></Cell>
+    <Cell ss:StyleID="cell"><Data ss:Type="String">${escape(r.town || "-")}</Data></Cell>
+    <Cell ss:StyleID="cell"><Data ss:Type="String">${escape(r.civil_id)}</Data></Cell>
+    <Cell ss:StyleID="cell"><Data ss:Type="String">${r.gender === "male" ? "ذكر" : "أنثى"}</Data></Cell>
+    <Cell ss:StyleID="cell"><Data ss:Type="String">${escape(r.level_name)}</Data></Cell>
+    <Cell ss:StyleID="cell"><Data ss:Type="String">${escape(judges || "-")}</Data></Cell>`;
+
+        for (let i = 0; i < maxJuzCount; i++) {
+          const juz = r.juz_details?.[i];
+          if (juz) {
+            const score = juz.average || 0;
+            const style = score >= 75 ? "pass" : "fail";
+            xml += `\n    <Cell ss:StyleID="${style}"><Data ss:Type="Number">${score.toFixed(1)}</Data></Cell>`;
+          } else {
+            xml += `\n    <Cell ss:StyleID="cell"><Data ss:Type="String">-</Data></Cell>`;
+          }
+        }
+
+        xml += `
+    <Cell ss:StyleID="${statusStyle}"><Data ss:Type="Number">${finalScore.toFixed(2)}</Data></Cell>
+    <Cell ss:StyleID="${statusStyle}"><Data ss:Type="String">${status}</Data></Cell>
+   </Row>`;
+      });
+
+      xml += `
+  </Table>
+  <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+   <DisplayRightToLeft/>
+  </WorksheetOptions>
+ </Worksheet>`;
     });
 
-    html += `
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
+    xml += `</Workbook>`;
 
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    const blob = new Blob([xml], { type: "application/vnd.ms-excel" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `نتائج_تفصيلية_${competition?.name || "المسابقة"}.xls`);
+    link.setAttribute("download", `نتائج_مفصلة_${competition?.name || "المسابقة"}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -569,11 +657,35 @@ export default function AdminDashboard() {
                           {r.average_score ? r.average_score.toFixed(2) : "-"}
                         </TableCell>
                         <TableCell className="text-center">
-                          {r.judge_count >= 2 ? (
-                            <div className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">مكتمل</div>
-                          ) : (
-                            <div className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">قيد التقييم</div>
-                          )}
+                          {(() => {
+                            const finalScore = r.average_score || 0;
+                            const passedJuzCount = r.juz_details?.filter((j: any) => j.average >= 75).length || 0;
+                            const totalJuzCount = r.juz_count || 0;
+
+                            if (r.judge_count < 2) {
+                              return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">قيد التقييم</Badge>;
+                            }
+
+                            if (finalScore >= 75) {
+                              if (passedJuzCount === totalJuzCount) {
+                                return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">مجاز</Badge>;
+                              } else if (passedJuzCount > 0) {
+                                const targetLevel = competition?.levels
+                                  ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
+                                  ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
+                                
+                                return (
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                                    {targetLevel ? `ينزل إلى (${targetLevel.name})` : `مجاز جزئياً (${passedJuzCount} أجزاء)`}
+                                  </Badge>
+                                );
+                              } else {
+                                return <Badge variant="destructive" className="text-[10px]">لم ينجح في أي جزء</Badge>;
+                              }
+                            } else {
+                              return <Badge variant="destructive">غير مجاز</Badge>;
+                            }
+                          })()}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
