@@ -224,24 +224,98 @@ export default function AdminDashboard() {
     }
   };
 
-  const exportToCSV = () => {
-    const headers = ["الاسم", "الجنس", "الرقم المدني", "المستوى", "البلدة", "المتوسط", "عدد المقيمين"];
-    const rows = results.map(r => [
-      `"${r.name}"`, 
-      r.gender === 'male' ? 'ذكر' : 'أنثى', 
-      `'${r.civil_id}`, 
-      `"${r.level_name}"`, 
-      `"${r.town}"`, 
-      r.average_score?.toFixed(2) || 0, 
-      r.judge_count
-    ]);
+  const exportToExcel = () => {
+    // Collect all data and determine max Juz count for columns
+    const maxJuzCount = Math.max(...results.map(r => r.juz_details?.length || 0), 0);
     
-    let csvContent = "\uFEFF" + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8">
+        <style>
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: center; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .pass { background-color: #c6efce; color: #006100; }
+          .fail { background-color: #ffc7ce; color: #9c0006; }
+          .header-main { background-color: #d9ead3; }
+        </style>
+      </head>
+      <body dir="rtl">
+        <h3>نتائج مسابقة حفظ القرآن الكريم - ${competition?.name || ""}</h3>
+        <table>
+          <thead>
+            <tr class="header-main">
+              <th>الاسم</th>
+              <th>رقم الهاتف</th>
+              <th>البلد/الولاية</th>
+              <th>الرقم المدني</th>
+              <th>الجنس</th>
+              <th>المستوى</th>
+              <th>المقيمين أرقام هواتفهم</th>
+    `;
+
+    // Add Juz columns
+    for (let i = 1; i <= maxJuzCount; i++) {
+      html += `<th>الجزء ${i}</th>`;
+    }
+
+    html += `
+              <th>الدرجة النهائية</th>
+              <th>الأداء (الإجازة)</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    results.forEach(r => {
+      const judges = (r.judge_info || []).map((j: any) => `${j.name} (${j.phone})`).join(" | ");
+      const finalScore = r.average_score || 0;
+      const status = finalScore >= 75 ? "مجاز" : "غير مجاز";
+      const statusClass = finalScore >= 75 ? "pass" : "fail";
+
+      html += `
+        <tr>
+          <td>${r.name}</td>
+          <td dir="ltr">${r.phone || "-"}</td>
+          <td>${r.town || "-"}</td>
+          <td dir="ltr">'${r.civil_id}</td>
+          <td>${r.gender === 'male' ? 'ذكر' : 'أنثى'}</td>
+          <td>${r.level_name}</td>
+          <td>${judges || "-"}</td>
+      `;
+
+      // Juz Scores
+      for (let i = 0; i < maxJuzCount; i++) {
+        const juz = r.juz_details?.[i];
+        if (juz) {
+          const score = juz.average || 0;
+          const juzClass = score >= 75 ? "pass" : "fail";
+          html += `<td class="${juzClass}">${score.toFixed(1)}</td>`;
+        } else {
+          html += `<td>-</td>`;
+        }
+      }
+
+      html += `
+          <td class="${statusClass} font-bold">${finalScore.toFixed(2)}</td>
+          <td class="${statusClass} font-bold">${status}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `نتائج_المسابقة_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute("download", `نتائج_تفصيلية_${competition?.name || "المسابقة"}.xls`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -386,9 +460,9 @@ export default function AdminDashboard() {
                 <CardTitle>جدول النتائج التفصيلي</CardTitle>
                 <CardDescription>عرض وتصدير نتائج جميع المتسابقين</CardDescription>
               </div>
-              <Button onClick={exportToCSV} variant="outline" className="flex items-center gap-2">
+              <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2 bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100">
                 <Download className="w-4 h-4" />
-                تصدير CSV
+                تصدير ملف Excel تفصيلي
               </Button>
             </CardHeader>
             <CardContent>
