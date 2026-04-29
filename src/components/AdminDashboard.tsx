@@ -330,35 +330,33 @@ export default function AdminDashboard() {
       levelResults.forEach(r => {
         const judges = (r.judge_info || []).map((j: any) => `${j.name} (${j.phone})`).join(" | ");
         const finalScore = r.average_score || 0;
-        const passedJuzCount = r.juz_details?.filter((j: any) => j.average >= 75).length || 0;
+        const passedJuz = r.juz_details?.filter((j: any) => j.average >= 75) || [];
+        const passedJuzCount = passedJuz.length;
         const totalJuzCount = r.juz_count || 0;
+        const passedAverage = passedJuzCount > 0 
+          ? passedJuz.reduce((acc: number, curr: any) => acc + (curr.average || 0), 0) / passedJuzCount 
+          : 0;
 
         let status = "";
         let statusStyle = "fail";
 
-        if (finalScore >= 75) {
-          if (passedJuzCount === totalJuzCount) {
-            status = "مجاز";
-            statusStyle = "pass";
-          } else if (passedJuzCount > 0) {
-            // Find the highest level that matches or is below the passed juz count
-            // We exclude the current level to ensure it's a "downgrade" as requested
-            const targetLevel = competition?.levels
-              ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
-              ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
-            
-            if (targetLevel) {
-              status = `ينزل إلى (${targetLevel.name})`;
-            } else {
-              status = `مجاز جزئياً (${passedJuzCount} أجزاء)`;
-            }
-            statusStyle = "pass";
+        if (passedJuzCount === totalJuzCount && finalScore >= 75) {
+          status = "مجاز";
+          statusStyle = "pass";
+        } else if (passedJuzCount > 0) {
+          // Find the highest level that matches or is below the passed juz count
+          const targetLevel = competition?.levels
+            ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
+            ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
+          
+          if (targetLevel) {
+            status = `ينزل إلى (${targetLevel.name}) [معدل الأجزاء: ${passedAverage.toFixed(2)}]`;
           } else {
-            status = "غير مجاز (لم ينجح في أي جزء)";
-            statusStyle = "fail";
+            status = `مجاز في (${passedJuzCount}) أجزاء [بمعدل: ${passedAverage.toFixed(2)}]`;
           }
+          statusStyle = "pass";
         } else {
-          status = "غير مجاز";
+          status = finalScore >= 75 ? "غير مجاز (فشل في الأجزاء)" : "غير مجاز";
           statusStyle = "fail";
         }
 
@@ -659,29 +657,32 @@ export default function AdminDashboard() {
                         <TableCell className="text-center">
                           {(() => {
                             const finalScore = r.average_score || 0;
-                            const passedJuzCount = r.juz_details?.filter((j: any) => j.average >= 75).length || 0;
+                            const passedJuz = r.juz_details?.filter((j: any) => j.average >= 75) || [];
+                            const passedJuzCount = passedJuz.length;
                             const totalJuzCount = r.juz_count || 0;
+                            const passedAverage = passedJuzCount > 0 
+                              ? passedJuz.reduce((acc: number, curr: any) => acc + (curr.average || 0), 0) / passedJuzCount 
+                              : 0;
 
                             if (r.judge_count < 2) {
                               return <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">قيد التقييم</Badge>;
                             }
 
-                            if (finalScore >= 75) {
-                              if (passedJuzCount === totalJuzCount) {
-                                return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">مجاز</Badge>;
-                              } else if (passedJuzCount > 0) {
-                                const targetLevel = competition?.levels
-                                  ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
-                                  ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
-                                
-                                return (
+                            if (passedJuzCount === totalJuzCount && finalScore >= 75) {
+                              return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">مجاز</Badge>;
+                            } else if (passedJuzCount > 0) {
+                              const targetLevel = competition?.levels
+                                ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
+                                ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
+                              
+                              return (
+                                <div className="flex flex-col gap-1 items-center">
                                   <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                                    {targetLevel ? `ينزل إلى (${targetLevel.name})` : `مجاز جزئياً (${passedJuzCount} أجزاء)`}
+                                    {targetLevel ? `ينزل إلى (${targetLevel.name})` : `مجاز في (${passedJuzCount}) أجزاء`}
                                   </Badge>
-                                );
-                              } else {
-                                return <Badge variant="destructive" className="text-[10px]">لم ينجح في أي جزء</Badge>;
-                              }
+                                  <span className="text-[9px] text-slate-500 font-bold">معدل الإجازة: {passedAverage.toFixed(1)}</span>
+                                </div>
+                              );
                             } else {
                               return <Badge variant="destructive">غير مجاز</Badge>;
                             }
