@@ -441,28 +441,41 @@ export default function AdminDashboard() {
     }));
 
   return (
-    <div className="space-y-8">
-      <Tabs defaultValue="results" className="w-full">
-        <TabsList className="bg-white border border-slate-200 mb-6">
-          <TabsTrigger value="results" className="flex items-center gap-2">
+    <div className="max-w-6xl mx-auto space-y-10 py-4">
+      <Tabs defaultValue="results" className="w-full flex flex-col items-center">
+        <TabsList className="bg-white border border-slate-200 p-1 h-auto flex-wrap justify-center gap-2 rounded-2xl shadow-sm mb-10">
+          <TabsTrigger 
+            value="results" 
+            className="flex items-center gap-2 px-6 py-3 rounded-xl data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none transition-all"
+          >
             <FileText className="w-4 h-4" />
-            النتائج والتحليل
+            <span className="font-bold">النتائج والتحليل</span>
           </TabsTrigger>
-          <TabsTrigger value="competitions" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="competitions" 
+            className="flex items-center gap-2 px-6 py-3 rounded-xl data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none transition-all"
+          >
             <Trophy className="w-4 h-4" />
-            المسابقات
+            <span className="font-bold">المسابقات</span>
           </TabsTrigger>
-          <TabsTrigger value="setup" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="setup" 
+            className="flex items-center gap-2 px-6 py-3 rounded-xl data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none transition-all"
+          >
             <Settings className="w-4 h-4" />
-            إعداد المسابقة
+            <span className="font-bold">إعداد المسابقة</span>
           </TabsTrigger>
-          <TabsTrigger value="global" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="global" 
+            className="flex items-center gap-2 px-6 py-3 rounded-xl data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-none transition-all"
+          >
             <Settings className="w-4 h-4 text-emerald-600" />
-            إعدادات المنصة
+            <span className="font-bold">إعدادات المنصة</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="results" className="space-y-6">
+        <div className="w-full">
+          <TabsContent value="results" className="space-y-6 focus-visible:outline-none focus-visible:ring-0">
           {competition && (
             <Card className="bg-white border-slate-200">
               <CardHeader className="pb-4">
@@ -720,44 +733,42 @@ export default function AdminDashboard() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="competitions" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">قائمة المسابقات</CardTitle>
-                  <CardDescription>اختر مسابقة لعرض تفاصيلها أو تفعيلها</CardDescription>
+        <TabsContent value="competitions" className="space-y-10 focus-visible:outline-none focus-visible:ring-0">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="space-y-4">
+              <Card className="border-emerald-100 shadow-sm">
+                <CardHeader className="text-center pb-2">
+                  <CardTitle className="text-xl">البحث واختيار المسابقة</CardTitle>
+                  <CardDescription>اختر مسابقة من القائمة لعرض تفاصيلها أو تفعيلها</CardDescription>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-slate-100">
+                <CardContent>
+                  <div className="flex flex-wrap justify-center gap-3">
                     {allCompetitions.map((comp) => (
-                      <button
+                      <Button
                         key={comp.id}
+                        variant={competition?.id === comp.id ? "default" : "outline"}
                         onClick={() => setCompetition(comp)}
-                        className={`w-full text-right p-4 hover:bg-slate-50 transition-colors flex items-center justify-between ${
-                          competition?.id === comp.id ? "bg-emerald-50 border-r-4 border-emerald-600" : ""
+                        className={`h-auto py-3 px-6 rounded-2xl flex flex-col items-center gap-1 transition-all ${
+                          competition?.id === comp.id ? "bg-emerald-600 scale-105 shadow-lg shadow-emerald-100" : "hover:bg-emerald-50 hover:border-emerald-200"
                         }`}
                       >
-                        <div>
-                          <p className="font-bold text-slate-900">{comp.name}</p>
-                          <p className="text-xs text-slate-500">{comp.year}</p>
-                        </div>
+                        <span className="font-bold text-base">{comp.name}</span>
+                        <span className={`text-[10px] ${competition?.id === comp.id ? "text-emerald-100" : "text-slate-400"}`}>{comp.year}</span>
                         {comp.active === 1 && (
-                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">نشطة</Badge>
+                          <Badge className="mt-1 bg-white/20 text-white border-none text-[8px] px-1.5 h-4">نشطة</Badge>
                         )}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            <div className="lg:col-span-2">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               {competition ? (
-                <Card>
-                  <CardHeader className="bg-slate-50 border-b border-slate-100">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
+                <Card className="border-slate-200 shadow-xl overflow-hidden rounded-[2.5rem]">
+                  <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-8 text-center">
+                    <div className="space-y-4">
                         {editingCompId === competition.id ? (
                           <div className="space-y-4 max-w-md">
                             <div className="space-y-2">
@@ -801,7 +812,7 @@ export default function AdminDashboard() {
                           </>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex justify-center gap-2">
                         {editingCompId !== competition.id && (
                           <Button 
                             variant="outline" 
@@ -829,8 +840,7 @@ export default function AdminDashboard() {
                           </Button>
                         )}
                       </div>
-                    </div>
-                  </CardHeader>
+                    </CardHeader>
                   <CardContent className="pt-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl">
@@ -941,192 +951,252 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        <TabsContent value="setup">
-          <Card>
-            <CardHeader>
-              <CardTitle>إعداد مسابقة جديدة</CardTitle>
-              <CardDescription>تحديد المستويات وبنود التقييم للمسابقة القادمة</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>اسم المسابقة</Label>
-                  <Input value={newComp.name} onChange={e => setNewComp({...newComp, name: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>السنة</Label>
-                  <Input type="number" value={newComp.year} onChange={e => setNewComp({...newComp, year: parseInt(e.target.value)})} />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-bold">المستويات</h3>
-                  <Button onClick={handleAddLevel} variant="outline" size="sm" className="flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    إضافة مستوى
-                  </Button>
-                </div>
-
-                {newComp.levels.map((level, lIdx) => (
-                  <Card key={lIdx} className="bg-slate-50 border-slate-200">
-                    <CardContent className="pt-6 space-y-4">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2 col-span-1">
-                          <Label>اسم المستوى</Label>
-                          <Input 
-                            value={level.name} 
-                            onChange={e => {
-                              const levels = [...newComp.levels];
-                              levels[lIdx].name = e.target.value;
-                              setNewComp({...newComp, levels});
-                            }} 
-                          />
-                        </div>
-                        <div className="space-y-2 col-span-1">
-                          <Label>الوصف</Label>
-                          <Input 
-                            value={level.description} 
-                            onChange={e => {
-                              const levels = [...newComp.levels];
-                              levels[lIdx].description = e.target.value;
-                              setNewComp({...newComp, levels});
-                            }} 
-                          />
-                        </div>
-                        <div className="space-y-2 col-span-1">
-                          <Label>عدد الأجزاء</Label>
-                          <Input 
-                            type="number"
-                            min="1"
-                            value={level.juz_count || 1} 
-                            onChange={e => {
-                              const levels = [...newComp.levels];
-                              (levels[lIdx] as any).juz_count = parseInt(e.target.value);
-                              setNewComp({...newComp, levels});
-                            }} 
-                          />
-                        </div>
-                        <div className="space-y-2 col-span-1">
-                          <Label>عدد المواضع</Label>
-                          <Input 
-                            type="number"
-                            min="1"
-                            value={(level as any).positions_count || 5} 
-                            onChange={e => {
-                              const levels = [...newComp.levels];
-                              (levels[lIdx] as any).positions_count = parseInt(e.target.value);
-                              setNewComp({...newComp, levels});
-                            }} 
-                          />
-                        </div>
-                        <div className="space-y-2 col-span-1">
-                          <Label>الرتبة (1 للأقل)</Label>
-                          <Input 
-                            type="number"
-                            value={level.rank || 0} 
-                            onChange={e => {
-                              const levels = [...newComp.levels];
-                              (levels[lIdx] as any).rank = parseInt(e.target.value);
-                              setNewComp({...newComp, levels});
-                            }} 
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label className="text-xs text-slate-500 uppercase tracking-wider">بنود التقييم</Label>
-                        {level.criteria.map((crit, cIdx) => (
-                          <div key={cIdx} className="flex gap-2 items-center">
-                            <Input 
-                              placeholder="اسم البند" 
-                              value={crit.name}
-                              onChange={e => {
-                                const levels = [...newComp.levels];
-                                levels[lIdx].criteria[cIdx].name = e.target.value;
-                                setNewComp({...newComp, levels});
-                              }}
-                            />
-                            <Input 
-                              type="number" 
-                              placeholder="الدرجة" 
-                              className="w-24" 
-                              value={crit.max_score}
-                              onChange={e => {
-                                const levels = [...newComp.levels];
-                                levels[lIdx].criteria[cIdx].max_score = parseInt(e.target.value);
-                                setNewComp({...newComp, levels});
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <Button onClick={handleCreateCompetition} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 text-lg font-bold">
-                حفظ وتفعيل المسابقة
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="global" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>الإعدادات العامة للمنصة</CardTitle>
-              <CardDescription>تحكم في الشعار والاسم الرسمي للمنصة</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              <div className="flex flex-col md:flex-row items-center gap-8 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
-                <div className="relative group">
-                  <div className="w-48 h-48 bg-white rounded-[2rem] shadow-xl border border-slate-200 flex items-center justify-center overflow-hidden">
-                    {globalSettings.site_logo ? (
-                      <img src={globalSettings.site_logo} alt="شعار المنصة الحالي" className="w-full h-full object-contain p-4" />
-                    ) : (
-                      <div className="text-slate-300 text-center p-4">
-                        <Settings className="w-12 h-12 mx-auto mb-2 opacity-20" />
-                        <p className="text-xs">لا يوجد شعار مخصص</p>
-                      </div>
-                    )}
+        <TabsContent value="setup" className="space-y-10 focus-visible:outline-none focus-visible:ring-0">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <Card className="border-slate-200 shadow-xl rounded-[2.5rem] overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-8 text-center uppercase tracking-wider">
+                <CardTitle className="text-2xl font-black">إعداد مسابقة قرآنية جديدة</CardTitle>
+                <CardDescription>أدخل تفاصيل المسابقة والمستويات والمعايير</CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2 text-right">
+                    <Label className="text-slate-700 font-bold mr-1">اسم المسابقة</Label>
+                    <Input 
+                      value={newComp.name} 
+                      onChange={(e) => setNewComp({ ...newComp, name: e.target.value })}
+                      className="rounded-2xl h-12 border-slate-200 bg-slate-50 focus:bg-white transition-colors"
+                      placeholder="مثال: مسابقة ربيع القلوب"
+                    />
                   </div>
-                  <Label 
-                    htmlFor="logo-upload" 
-                    className="absolute inset-0 bg-black/40 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-[2rem]"
-                  >
-                    <Plus className="w-8 h-8 mb-2" />
-                    <span className="text-sm font-bold">تغيير الشعار</span>
-                  </Label>
-                  <input 
-                    id="logo-upload" 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleLogoUpload}
-                  />
+                  <div className="space-y-2 text-right">
+                    <Label className="text-slate-700 font-bold mr-1">السنة</Label>
+                    <Input 
+                      type="number" 
+                      value={newComp.year} 
+                      onChange={(e) => setNewComp({ ...newComp, year: parseInt(e.target.value) })}
+                      className="rounded-2xl h-12 border-slate-200 bg-slate-50 focus:bg-white transition-colors"
+                    />
+                  </div>
                 </div>
-                <div className="flex-1 space-y-4">
-                  <h3 className="text-2xl font-black text-slate-900">شعار المنصة الرسمي</h3>
-                  <p className="text-slate-500 leading-relaxed max-w-md">
-                    هذا الشعار سيظهر في أعلى جميع الصفحات (بوابة التسجيل، بوابة المقيمين، الصفحة الرئيسية). 
-                    يفضل استخدام صورة بخلفية شفافة (PNG) وبقياسات مربعة.
-                  </p>
-                  <div className="flex gap-4">
+
+                <div className="space-y-6 pt-4 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-black text-slate-900 border-r-4 border-emerald-500 pr-3">المستويات والمعايير</h3>
                     <Button 
                       variant="outline" 
-                      onClick={() => document.getElementById('logo-upload')?.click()}
-                      className="rounded-xl"
+                      onClick={handleAddLevel}
+                      className="rounded-xl border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                     >
-                      تحميل صورة جديدة
+                      <Plus className="w-4 h-4 ml-2" />
+                      إضافة مستوى جديد
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {newComp.levels.map((level, lIndex) => (
+                      <div key={lIndex} className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-6 relative group border-r-4 border-r-slate-200 hover:border-r-emerald-400 transition-all">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2 text-right">
+                            <Label className="text-xs font-bold text-slate-500 mr-2">اسم المستوى</Label>
+                            <Input 
+                              value={level.name} 
+                              onChange={(e) => {
+                                const levels = [...newComp.levels];
+                                levels[lIndex].name = e.target.value;
+                                setNewComp({ ...newComp, levels });
+                              }}
+                              className="rounded-xl bg-white border-slate-100"
+                              placeholder="مثال: المستوى الأول"
+                            />
+                          </div>
+                          <div className="space-y-2 text-right">
+                            <Label className="text-xs font-bold text-slate-500 mr-2">وصف المستوى</Label>
+                            <Input 
+                              value={level.description} 
+                              onChange={(e) => {
+                                const levels = [...newComp.levels];
+                                levels[lIndex].description = e.target.value;
+                                setNewComp({ ...newComp, levels });
+                              }}
+                              className="rounded-xl bg-white border-slate-100"
+                              placeholder="مثال: حفظ 5 أجزاء"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-2 text-right">
+                              <Label className="text-xs font-bold text-slate-500 mr-2">الأجزاء</Label>
+                              <Input 
+                                type="number"
+                                value={level.juz_count} 
+                                onChange={(e) => {
+                                  const levels = [...newComp.levels];
+                                  levels[lIndex].juz_count = parseInt(e.target.value);
+                                  setNewComp({ ...newComp, levels });
+                                }}
+                                className="rounded-xl bg-white border-slate-100"
+                              />
+                            </div>
+                            <div className="space-y-2 text-right">
+                              <Label className="text-xs font-bold text-slate-500 mr-2">الرتبة</Label>
+                              <Input 
+                                type="number"
+                                value={level.rank || 0} 
+                                onChange={(e) => {
+                                  const levels = [...newComp.levels];
+                                  (levels[lIndex] as any).rank = parseInt(e.target.value);
+                                  setNewComp({ ...newComp, levels });
+                                }}
+                                className="rounded-xl bg-white border-slate-100"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <Label className="text-xs font-bold text-slate-400 mr-2 uppercase tracking-widest">معايير التقييم لهذا المستوى</Label>
+                          {level.criteria.map((crit, cIndex) => (
+                            <div key={cIndex} className="flex gap-4 items-end bg-white/50 p-3 rounded-xl border border-slate-200/50">
+                              <div className="flex-1 space-y-1 text-right">
+                                <Label className="text-[10px] text-slate-500 mr-1">المعيار</Label>
+                                <Input 
+                                  value={crit.name} 
+                                  onChange={(e) => {
+                                    const levels = [...newComp.levels];
+                                    levels[lIndex].criteria[cIndex].name = e.target.value;
+                                    setNewComp({ ...newComp, levels });
+                                  }}
+                                  className="h-9 rounded-lg"
+                                />
+                              </div>
+                              <div className="w-24 space-y-1 text-right">
+                                <Label className="text-[10px] text-slate-500 mr-1">الدرجة القصوى</Label>
+                                <Input 
+                                  type="number"
+                                  value={crit.max_score} 
+                                  onChange={(e) => {
+                                    const levels = [...newComp.levels];
+                                    levels[lIndex].criteria[cIndex].max_score = parseInt(e.target.value);
+                                    setNewComp({ ...newComp, levels });
+                                  }}
+                                  className="h-9 rounded-lg"
+                                />
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="text-slate-300 hover:text-red-500"
+                                onClick={() => {
+                                  const levels = [...newComp.levels];
+                                  levels[lIndex].criteria = levels[lIndex].criteria.filter((_, i) => i !== cIndex);
+                                  setNewComp({ ...newComp, levels });
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              const levels = [...newComp.levels];
+                              levels[lIndex].criteria.push({ name: "", max_score: 5 });
+                              setNewComp({ ...newComp, levels });
+                            }}
+                            className="text-emerald-600 hover:bg-emerald-50 text-xs"
+                          >
+                            + إضافة معيار تقييم
+                          </Button>
+                        </div>
+
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="absolute -left-2 -top-2 bg-white shadow-sm border border-slate-100 text-red-500 rounded-full hover:bg-red-50"
+                          onClick={() => {
+                            const levels = newComp.levels.filter((_, i) => i !== lIndex);
+                            setNewComp({ ...newComp, levels });
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-slate-100 flex justify-center">
+                  <Button 
+                    onClick={handleCreateCompetition}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl h-16 px-12 text-xl font-black shadow-xl shadow-emerald-100 transition-transform hover:scale-105 active:scale-95"
+                  >
+                    إنشاء المسابقة وتفعيلها الآن
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        <TabsContent value="global" className="space-y-10 focus-visible:outline-none focus-visible:ring-0">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <Card className="border-slate-200 shadow-xl rounded-[2.5rem] overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-8 text-center uppercase tracking-wider">
+                <CardTitle className="text-2xl font-black">الإعدادات العامة للمنصة</CardTitle>
+                <CardDescription>تحكم في الشعار والاسم الرسمي للمنصة</CardDescription>
+              </CardHeader>
+              <CardContent className="p-8 space-y-8">
+                <div className="flex flex-col md:flex-row items-center gap-12 bg-slate-50 p-10 rounded-[3rem] border border-slate-100">
+                  <div className="relative group shrink-0">
+                    <div className="w-56 h-56 bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 flex items-center justify-center overflow-hidden p-6 transition-transform group-hover:scale-105">
+                      {globalSettings.site_logo ? (
+                        <img src={globalSettings.site_logo} alt="شعار المنصة الحالي" className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="text-slate-300 text-center">
+                          <Settings className="w-16 h-16 mx-auto mb-2 opacity-20" />
+                          <p className="text-xs">لا يوجد شعار</p>
+                        </div>
+                      )}
+                    </div>
+                    <Label 
+                      htmlFor="logo-upload" 
+                      className="absolute inset-0 bg-black/60 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer rounded-[2.5rem] backdrop-blur-sm"
+                    >
+                      <Plus className="w-10 h-10 mb-2" />
+                      <span className="text-sm font-black uppercase tracking-widest">تغيير الشعار</span>
+                    </Label>
+                    <input 
+                      id="logo-upload" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleLogoUpload}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-6 text-right md:text-right">
+                    <div className="space-y-2">
+                      <h3 className="text-3xl font-black text-slate-900">شعار المنصة الرسمي</h3>
+                      <div className="w-20 h-1.5 bg-emerald-500 rounded-full"></div>
+                    </div>
+                    <p className="text-slate-500 leading-relaxed text-lg italic">
+                      هذا الشعار سيظهر في أعلى جميع الصفحات (بوابة التسجيل، بوابة المقيمين، الصفحة الرئيسية). 
+                      يفضل استخدام صورة بخلفية شفافة (PNG) وبقياسات مربعة لضمان أفضل ظهور.
+                    </p>
+                    <Button 
+                      onClick={() => document.getElementById('logo-upload')?.click()}
+                      className="bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-emerald-200 hover:text-emerald-700 rounded-2xl h-14 px-8 font-bold transition-all shadow-sm"
+                    >
+                      <Download className="w-5 h-5 ml-2" />
+                      تحميل شعار جديد من الجهاز
                     </Button>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
-      </Tabs>
-    </div>
-  );
+      </div>
+    </Tabs>
+  </div>
+);
 }
