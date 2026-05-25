@@ -344,10 +344,23 @@ export default function AdminDashboard() {
           status = "مجاز";
           statusStyle = "pass";
         } else if (passedJuzCount > 0) {
-          // Find the highest level that matches or is below the passed juz count
+          // Find the highest level that matches or is below the passed juz count and respects the rank (higher rank number is lower level)
+          const currentLevel = competition?.levels?.find((l: any) => l.id === r.level_id);
+          const currentRank = currentLevel?.rank || 0;
+
           const targetLevel = competition?.levels
-            ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
-            ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
+            ?.filter((l: any) => {
+              if (l.id === r.level_id) return false;
+              if (l.juz_count > passedJuzCount) return false;
+              if (currentRank > 0 && l.rank && l.rank <= currentRank) return false;
+              return true;
+            })
+            ?.sort((a: any, b: any) => {
+              if (b.juz_count !== a.juz_count) {
+                return b.juz_count - a.juz_count;
+              }
+              return (a.rank || 999) - (b.rank || 999);
+            })[0];
           
           if (targetLevel) {
             status = `ينزل إلى (${targetLevel.name}) [معدل الأجزاء: ${passedAverage.toFixed(2)}]`;
@@ -684,9 +697,22 @@ export default function AdminDashboard() {
                             if (passedJuzCount === totalJuzCount && finalScore >= 75) {
                               return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">مجاز</Badge>;
                             } else if (passedJuzCount > 0) {
+                              const currentLevel = competition?.levels?.find((l: any) => l.id === r.level_id);
+                              const currentRank = currentLevel?.rank || 0;
+
                               const targetLevel = competition?.levels
-                                ?.filter((l: any) => l.juz_count <= passedJuzCount && l.id !== r.level_id)
-                                ?.sort((a: any, b: any) => b.juz_count - a.juz_count)[0];
+                                ?.filter((l: any) => {
+                                  if (l.id === r.level_id) return false;
+                                  if (l.juz_count > passedJuzCount) return false;
+                                  if (currentRank > 0 && l.rank && l.rank <= currentRank) return false;
+                                  return true;
+                                })
+                                ?.sort((a: any, b: any) => {
+                                  if (b.juz_count !== a.juz_count) {
+                                    return b.juz_count - a.juz_count;
+                                  }
+                                  return (a.rank || 999) - (b.rank || 999);
+                                })[0];
                               
                               return (
                                 <div className="flex flex-col gap-1 items-center">
