@@ -58,10 +58,26 @@ class ErrorBoundary extends Component<Props, State> {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("home");
+  const [unlockedTabs, setUnlockedTabs] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("unlocked_tabs");
+      return saved ? JSON.parse(saved) : { home: true };
+    } catch {
+      return { home: true };
+    }
+  });
+
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const saved = localStorage.getItem("active_tab");
+      return saved && JSON.parse(saved) ? JSON.parse(saved) : "home";
+    } catch {
+      return "home";
+    }
+  });
+
   const [competition, setCompetition] = useState<any>(null);
   const [settings, setSettings] = useState<Record<string, any>>({});
-  const [unlockedTabs, setUnlockedTabs] = useState<Record<string, boolean>>({ home: true });
   const [accessCode, setAccessCode] = useState("");
   const [showCodePrompt, setShowCodePrompt] = useState<string | null>(null);
 
@@ -74,6 +90,22 @@ export default function App() {
       .then((res) => res.json())
       .then((data) => setSettings(data));
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("unlocked_tabs", JSON.stringify(unlockedTabs));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [unlockedTabs]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("active_tab", JSON.stringify(activeTab));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [activeTab]);
 
   const handleTabChange = (value: string) => {
     if (unlockedTabs[value]) {
@@ -96,7 +128,7 @@ export default function App() {
 
       if (showCodePrompt === "admin") {
         if (trimmedCode === "admin2026") {
-          setUnlockedTabs({ ...unlockedTabs, admin: true });
+          setUnlockedTabs(prev => ({ ...prev, admin: true }));
           setActiveTab("admin");
           setShowCodePrompt(null);
           setAccessCode("");
@@ -105,7 +137,7 @@ export default function App() {
         }
       } else if (showCodePrompt === "register") {
         if (trimmedCode === (latestComp?.registration_code || "123456")) {
-          setUnlockedTabs({ ...unlockedTabs, register: true });
+          setUnlockedTabs(prev => ({ ...prev, register: true }));
           setActiveTab("register");
           setShowCodePrompt(null);
           setAccessCode("");
@@ -114,7 +146,7 @@ export default function App() {
         }
       } else if (showCodePrompt === "judge") {
         if (trimmedCode === (latestComp?.judging_code || "123456")) {
-          setUnlockedTabs({ ...unlockedTabs, judge: true });
+          setUnlockedTabs(prev => ({ ...prev, judge: true }));
           setActiveTab("judge");
           setShowCodePrompt(null);
           setAccessCode("");

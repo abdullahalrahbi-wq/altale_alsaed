@@ -14,10 +14,33 @@ export default function JudgeDashboard() {
   const [criteria, setCriteria] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [judgeId, setJudgeId] = useState<string>("1");
-  const [judgeName, setJudgeName] = useState<string>("");
-  const [judgePhone, setJudgePhone] = useState<string>("");
+  
+  const [judgeId, setJudgeId] = useState<string>(() => {
+    try {
+      return localStorage.getItem("judge_id") || "1";
+    } catch {
+      return "1";
+    }
+  });
+  
+  const [judgeName, setJudgeName] = useState<string>(() => {
+    try {
+      return localStorage.getItem("judge_name") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const [judgePhone, setJudgePhone] = useState<string>(() => {
+    try {
+      return localStorage.getItem("judge_phone") || "";
+    } catch {
+      return "";
+    }
+  });
+
   const [genderFilter, setGenderFilter] = useState<string>("all");
+  const [completedJudges, setCompletedJudges] = useState<number[]>([]);
 
   // Specific scoring state per Juz
   const [juzScores, setJuzScores] = useState<Record<number, { 
@@ -25,6 +48,24 @@ export default function JudgeDashboard() {
     tajweedScore: number, 
     positionErrors: number[] 
   }>>({});
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("judge_id", judgeId);
+    } catch {}
+  }, [judgeId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("judge_name", judgeName);
+    } catch {}
+  }, [judgeName]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("judge_phone", judgePhone);
+    } catch {}
+  }, [judgePhone]);
 
   useEffect(() => {
     fetchContestants();
@@ -46,9 +87,30 @@ export default function JudgeDashboard() {
 
   const handleSelectContestant = async (contestant: any) => {
     setSelectedContestant(contestant);
+    setCompletedJudges([]);
     const res = await fetch(`/api/criteria/${contestant.level_id}`);
     const data = await res.json();
     setCriteria(data);
+
+    // Fetch already completed judges for this contestant
+    try {
+      const judgesRes = await fetch(`/api/contestants/${contestant.id}/completed-judges`);
+      if (judgesRes.ok) {
+        const judgedIds = await judgesRes.json() as number[];
+        setCompletedJudges(judgedIds);
+        
+        // Auto-switch to opposite judge ID
+        if (judgedIds.includes(1) && !judgedIds.includes(2)) {
+          setJudgeId("2");
+          toast.info("تنبيه: تم تقييم هذا المتسابق مسبقاً من المقيم الأول، تم تحويل اختيارك إلى المقيم الثاني تلقائياً.");
+        } else if (judgedIds.includes(2) && !judgedIds.includes(1)) {
+          setJudgeId("1");
+          toast.info("تنبيه: تم تقييم هذا المتسابق مسبقاً من المقيم الثاني، تم تحويل اختيارك إلى المقيم الأول تلقائياً.");
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching completed judges:", err);
+    }
     
     // Use juz_count from contestant object
     const juzCount = contestant.juz_count || 1;
@@ -247,16 +309,27 @@ export default function JudgeDashboard() {
                 {/* Judge Info at the Top */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-amber-50 rounded-2xl border border-amber-100">
                   <div>
-                    <Label className="text-amber-900 font-bold text-xs">رقم المقيم</Label>
+                    <Label className="text-amber-900 font-bold text-xs flex justify-between">
+                      <span>رقم المقيم</span>
+                    </Label>
                     <Select value={judgeId} onValueChange={setJudgeId}>
-                      <SelectTrigger className="mt-1 bg-white border-amber-200 h-10">
+                      <SelectTrigger className={`mt-1 bg-white border-amber-200 h-10 ${completedJudges.includes(parseInt(judgeId)) ? "ring-2 ring-red-500 border-red-500" : ""}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">المقيم الأول</SelectItem>
-                        <SelectItem value="2">المقيم الثاني</SelectItem>
+                        <SelectItem value="1">
+                          المقيم الأول {completedJudges.includes(1) ? "✅ (قيّم مسبقاً)" : ""}
+                        </SelectItem>
+                        <SelectItem value="2">
+                          المقيم الثاني {completedJudges.includes(2) ? "✅ (قيّم مسبقاً)" : ""}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
+                    {completedJudges.includes(parseInt(judgeId)) && (
+                      <p className="text-[10px] text-red-600 font-bold mt-1 animate-pulse">
+                        ⚠️ تنبيه: المقيم المختار رصد درجاته لهذا المتسابق بالفعل!
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label className="text-amber-900 font-bold text-xs">اسم المقيم</Label>
