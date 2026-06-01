@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Award, User, CheckCircle2, Loader2, Star, Minus, Plus, RotateCcw } from "lucide-react";
+import { Award, User, CheckCircle2, Loader2, Star, Minus, Plus, RotateCcw, LogOut } from "lucide-react";
 
 export default function JudgeDashboard() {
   const [contestants, setContestants] = useState<any[]>([]);
@@ -181,6 +181,11 @@ export default function JudgeDashboard() {
       return;
     }
 
+    if (completedJudges.includes(parseInt(judgeId))) {
+      toast.error(`⚠️ تنبيه: لقد رصد المقيم ${judgeId === "1" ? "الأول" : "الثاني"} درجات هذا المتسابق بالفعل! يرجى اختيار رقم المقيم الآخر لمتابعة رصد الدرجات.`);
+      return;
+    }
+
     setSubmitting(true);
     
     // Map the calculated scores to the criteria for EACH Juz
@@ -236,6 +241,32 @@ export default function JudgeDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto p-2 sm:p-6 space-y-4 sm:space-y-8">
+      {/* Top Welcome & Exit Panel */}
+      <div className="flex flex-col sm:flex-row items-center justify-between bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm gap-4">
+        <div className="text-right w-full sm:w-auto">
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900">بوابة المقيمين</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">أهلاً بك يا فضيلة المقيم. يمكنك رصد درجات الطلاب هنا.</p>
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto justify-end">
+          <Button
+            variant="outline"
+            onClick={() => {
+              try {
+                const unlocked = JSON.parse(localStorage.getItem("unlocked_tabs") || "{}");
+                delete unlocked["judge"];
+                localStorage.setItem("unlocked_tabs", JSON.stringify(unlocked));
+                localStorage.setItem("active_tab", JSON.stringify("home"));
+              } catch (e) {}
+              window.location.reload();
+            }}
+            className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-bold px-4 py-2 text-xs flex items-center gap-1.5 w-full sm:w-auto select-none"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>تسجيل الخروج والعودة للرئيسية</span>
+          </Button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
         {/* Contestant List */}
         <div className="lg:col-span-1 space-y-4">
@@ -317,10 +348,10 @@ export default function JudgeDashboard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">
+                        <SelectItem value="1" disabled={completedJudges.includes(1)}>
                           المقيم الأول {completedJudges.includes(1) ? "✅ (قيّم مسبقاً)" : ""}
                         </SelectItem>
-                        <SelectItem value="2">
+                        <SelectItem value="2" disabled={completedJudges.includes(2)}>
                           المقيم الثاني {completedJudges.includes(2) ? "✅ (قيّم مسبقاً)" : ""}
                         </SelectItem>
                       </SelectContent>
