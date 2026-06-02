@@ -181,8 +181,9 @@ export default function JudgeDashboard() {
       return;
     }
 
-    if (completedJudges.includes(parseInt(judgeId))) {
-      toast.error(`⚠️ تنبيه: لقد رصد المقيم ${judgeId === "1" ? "الأول" : "الثاني"} درجات هذا المتسابق بالفعل! يرجى اختيار رقم المقيم الآخر لمتابعة رصد الدرجات.`);
+    const numericJudgeId = parseInt(judgeId);
+    if (completedJudges.some(id => Number(id) === numericJudgeId)) {
+      toast.error(`⚠️ تنبيه: لقد رصد المقيم ${numericJudgeId === 1 ? "الأول" : "الثاني"} درجات هذا المتسابق بالفعل! يرجى اختيار رقم المقيم الآخر لمتابعة رصد الدرجات.`);
       return;
     }
 
@@ -222,7 +223,8 @@ export default function JudgeDashboard() {
         setSelectedContestant(null);
         fetchContestants();
       } else {
-        toast.error("حدث خطأ أثناء إرسال التقييم");
+        const errorData = await res.json().catch(() => ({}));
+        toast.error(errorData.error || "حدث خطأ أثناء إرسال التقييم");
       }
     } catch (error) {
       toast.error("فشل الاتصال بالخادم");
@@ -344,19 +346,19 @@ export default function JudgeDashboard() {
                       <span>رقم المقيم</span>
                     </Label>
                     <Select value={judgeId} onValueChange={setJudgeId}>
-                      <SelectTrigger className={`mt-1 bg-white border-amber-200 h-10 ${completedJudges.includes(parseInt(judgeId)) ? "ring-2 ring-red-500 border-red-500" : ""}`}>
+                      <SelectTrigger className={`mt-1 bg-white border-amber-200 h-10 ${completedJudges.some(id => Number(id) === parseInt(judgeId)) ? "ring-2 ring-red-500 border-red-500" : ""}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1" disabled={completedJudges.includes(1)}>
-                          المقيم الأول {completedJudges.includes(1) ? "✅ (قيّم مسبقاً)" : ""}
+                        <SelectItem value="1" disabled={completedJudges.some(id => Number(id) === 1)}>
+                          المقيم الأول {completedJudges.some(id => Number(id) === 1) ? "✅ (قيّم مسبقاً)" : ""}
                         </SelectItem>
-                        <SelectItem value="2" disabled={completedJudges.includes(2)}>
-                          المقيم الثاني {completedJudges.includes(2) ? "✅ (قيّم مسبقاً)" : ""}
+                        <SelectItem value="2" disabled={completedJudges.some(id => Number(id) === 2)}>
+                          المقيم الثاني {completedJudges.some(id => Number(id) === 2) ? "✅ (قيّم مسبقاً)" : ""}
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                    {completedJudges.includes(parseInt(judgeId)) && (
+                    {completedJudges.some(id => Number(id) === parseInt(judgeId)) && (
                       <p className="text-[10px] text-red-600 font-bold mt-1 animate-pulse">
                         ⚠️ تنبيه: المقيم المختار رصد درجاته لهذا المتسابق بالفعل!
                       </p>
@@ -430,16 +432,15 @@ export default function JudgeDashboard() {
                             </div>
                           </div>
                           <div className="flex items-center justify-between bg-slate-50 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-inner overflow-hidden gap-4 select-none">
-                            {/* Minus Button (Decreases penalty/error count - corrects mistake) */}
+                            {/* Minus Button (Decreases score - adds a mistake) */}
                             <button
                               type="button"
-                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, -1)}
-                              disabled={(juzScores[juzIdx]?.positionErrors[posIdx] || 0) <= 0}
-                              className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-2xl border-2 border-b-[6px] border-slate-300 hover:border-slate-400 active:border-b-2 active:translate-y-1 shadow-md active:shadow-sm transition-all duration-75 flex flex-col items-center justify-center cursor-pointer disabled:opacity-20 disabled:pointer-events-none disabled:transform-none disabled:shadow-none flex-shrink-0"
-                              title="تقليل النقص / تراجع"
+                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, 1)}
+                              className="w-16 h-16 sm:w-20 sm:h-20 bg-red-500 hover:bg-red-400 active:bg-red-600 text-white font-bold rounded-2xl border-2 border-b-[6px] border-red-700 hover:border-red-500 active:border-b-2 active:translate-y-1 shadow-md hover:shadow-lg active:shadow-sm transition-all duration-75 flex flex-col items-center justify-center cursor-pointer flex-shrink-0"
+                              title="خصم درجة / إضافة خطأ"
                             >
                               <Minus className="w-8 h-8 sm:w-9 sm:h-9 stroke-[3]" />
-                              <span className="text-[10px] font-black mt-1">تراجع (-1)</span>
+                              <span className="text-[10px] font-black mt-1">نقص (-1)</span>
                             </button>
                             
                             {/* Display Center Container */}
@@ -452,15 +453,16 @@ export default function JudgeDashboard() {
                               <span className="text-[10px] sm:text-xs text-slate-500 font-black mt-2">مقدار النقص</span>
                             </div>
 
-                            {/* Plus Button (Increases penalty/error count - adds mistake) */}
+                            {/* Plus Button (Increases score - undoes mistake/error) */}
                             <button
                               type="button"
-                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, 1)}
-                              className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white font-bold rounded-2xl border-2 border-b-[6px] border-emerald-700 hover:border-emerald-500 active:border-b-2 active:translate-y-1 shadow-md hover:shadow-lg active:shadow-sm transition-all duration-75 flex flex-col items-center justify-center cursor-pointer flex-shrink-0"
-                              title="إضافة نقص / رصد خطأ"
+                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, -1)}
+                              disabled={(juzScores[juzIdx]?.positionErrors[posIdx] || 0) <= 0}
+                              className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-2xl border-2 border-b-[6px] border-slate-300 hover:border-slate-400 active:border-b-2 active:translate-y-1 shadow-md active:shadow-sm transition-all duration-75 flex flex-col items-center justify-center cursor-pointer disabled:opacity-20 disabled:pointer-events-none disabled:transform-none disabled:shadow-none flex-shrink-0"
+                              title="تراجع عن الخصم"
                             >
                               <Plus className="w-8 h-8 sm:w-9 sm:h-9 stroke-[3]" />
-                              <span className="text-[10px] font-black mt-1">دقة خطأ (+1)</span>
+                              <span className="text-[10px] font-black mt-1">تراجع (+1)</span>
                             </button>
                           </div>
                         </div>

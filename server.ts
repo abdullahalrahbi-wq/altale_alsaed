@@ -270,7 +270,7 @@ async function startServer() {
     const { id } = req.params;
     try {
       const evaluations = db.prepare("SELECT DISTINCT judge_id FROM evaluations WHERE contestant_id = ?").all(id) as { judge_id: number }[];
-      res.json(evaluations.map(e => e.judge_id));
+      res.json(evaluations.map(e => Number(e.judge_id)));
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -279,6 +279,16 @@ async function startServer() {
   // Submit evaluation
   app.post("/api/evaluate", (req, res) => {
     const { contestant_id, judge_id, judge_name, judge_phone, scores } = req.body; // scores: [ { juz_index, criteria_id, score } ]
+
+    // Security check: Verify if this judge has already evaluated this contestant
+    try {
+      const existing = db.prepare("SELECT COUNT(*) as count FROM evaluations WHERE contestant_id = ? AND judge_id = ?").get(contestant_id, judge_id) as { count: number };
+      if (existing && existing.count > 0) {
+        return res.status(400).json({ error: "⚠️ لقد قام هذا المقيم برصد درجات هذا المتسابق مسبقاً! يرجى اختيار رقم المقيم الآخر لمتابعة رصد الدرجات." });
+      }
+    } catch (dbError) {
+      console.error("Database check error:", dbError);
+    }
 
     const insert = db.prepare("INSERT INTO evaluations (contestant_id, judge_id, criteria_id, juz_index, score, judge_name, judge_phone) VALUES (?, ?, ?, ?, ?, ?, ?)");
     
