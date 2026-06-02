@@ -511,26 +511,87 @@ export default function AdminDashboard() {
           )}
 
           {/* Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-emerald-600 text-white">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-emerald-100">إجمالي المسجلين</CardDescription>
-                <CardTitle className="text-4xl">{results.length}</CardTitle>
-              </CardHeader>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 select-none">
+            {/* Card 1: Registrants */}
+            <Card className="bg-white border border-slate-200 shadow-sm border-r-4 border-r-emerald-500 transition-all hover:shadow-md hover:-translate-y-1 duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs sm:text-sm font-black text-slate-500">إجمالي المسجلين</p>
+                    <p className="text-3xl sm:text-4xl font-black text-slate-900 mt-2">{results.length}</p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <Users className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-slate-100 mt-4 text-[10px] sm:text-xs text-slate-500 flex items-center gap-1.5 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>الطلاب والطلبات في قائمة التنافس النشطة</span>
+                </div>
+              </CardContent>
             </Card>
-            <Card className="bg-blue-600 text-white">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-blue-100">تم تقييمهم</CardDescription>
-                <CardTitle className="text-4xl">{results.filter(r => r.judge_count >= 2).length}</CardTitle>
-              </CardHeader>
+
+            {/* Card 2: Evaluated */}
+            <Card className="bg-white border border-slate-200 shadow-sm border-r-4 border-r-blue-500 transition-all hover:shadow-md hover:-translate-y-1 duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs sm:text-sm font-black text-slate-500">تم تقييمهم (من المقيمَيْن)</p>
+                    <p className="text-3xl sm:text-4xl font-black text-slate-900 mt-2">
+                      {results.filter(r => r.judge_count >= 2).length}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                    <CheckCircle className="w-6 h-6" />
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-slate-100 mt-3 flex flex-col gap-1">
+                  <div className="text-[10px] sm:text-xs text-slate-500 flex justify-between font-bold">
+                    <span>تقييم كلي مكتمل (المقيم 1 وبوابة 2):</span>
+                    <span className="text-blue-600 font-black">{results.filter(r => r.judge_count >= 2).length}</span>
+                  </div>
+                  <div className="text-[10px] sm:text-xs text-slate-400 flex justify-between">
+                    <span>تحت التقييم (مقيم واحد فقط):</span>
+                    <span className="font-bold text-slate-600">{results.filter(r => r.judge_count === 1).length}</span>
+                  </div>
+                </div>
+              </CardContent>
             </Card>
-            <Card className="bg-amber-600 text-white">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-amber-100">متوسط الدرجات</CardDescription>
-                <CardTitle className="text-4xl">
-                  {(results.reduce((acc, curr) => acc + (curr.average_score || 0), 0) / (results.filter(r => r.average_score).length || 1)).toFixed(1)}
-                </CardTitle>
-              </CardHeader>
+
+            {/* Card 3: Percentage */}
+            <Card className="bg-white border border-slate-200 shadow-sm border-r-4 border-r-amber-500 transition-all hover:shadow-md hover:-translate-y-1 duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs sm:text-sm font-black text-slate-500">نسبة الطلاب المقيّمِين</p>
+                    <p className="text-3xl sm:text-4xl font-black text-slate-900 mt-2">
+                      {results.length > 0 
+                        ? ((results.filter(r => r.judge_count >= 2).length / results.length) * 100).toFixed(1) 
+                        : "0.0"} %
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+                    <BarChart3 className="w-6 h-6" />
+                  </div>
+                </div>
+                
+                {/* Visual Progress Bar */}
+                <div className="mt-3">
+                  <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-amber-500 h-full rounded-full transition-all duration-500" 
+                      style={{ 
+                        width: `${results.length > 0 
+                          ? Math.min(100, (results.filter(r => r.judge_count >= 2).length / results.length) * 100) 
+                          : 0}%` 
+                      }}
+                    />
+                  </div>
+                  <p className="text-[9px] sm:text-[10px] text-amber-700/85 font-black mt-1 text-right">
+                    نسبة الإنجاز مقاسة على اكتمال التقييمين للطلاب المسجلين
+                  </p>
+                </div>
+              </CardContent>
             </Card>
           </div>
 

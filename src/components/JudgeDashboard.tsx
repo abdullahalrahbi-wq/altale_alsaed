@@ -429,32 +429,39 @@ export default function JudgeDashboard() {
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200 overflow-hidden">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-14 w-14 text-red-600 hover:bg-red-100 flex-shrink-0"
-                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, 1)}
-                            >
-                              <Minus className="w-8 h-8" />
-                            </Button>
-                            
-                            <div className="flex flex-col items-center">
-                              <span className="text-3xl font-black text-slate-900 leading-none">
-                                {juzScores[juzIdx]?.positionErrors[posIdx] || 0}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-bold uppercase mt-2">مقدار النقص</span>
-                            </div>
-
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-14 w-14 text-emerald-600 hover:bg-emerald-100 disabled:opacity-20 flex-shrink-0"
+                          <div className="flex items-center justify-between bg-slate-50 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-inner overflow-hidden gap-4 select-none">
+                            {/* Minus Button (Decreases penalty/error count - corrects mistake) */}
+                            <button
+                              type="button"
                               onClick={() => adjustPositionDeduction(juzIdx, posIdx, -1)}
                               disabled={(juzScores[juzIdx]?.positionErrors[posIdx] || 0) <= 0}
+                              className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-2xl border-2 border-b-[6px] border-slate-300 hover:border-slate-400 active:border-b-2 active:translate-y-1 shadow-md active:shadow-sm transition-all duration-75 flex flex-col items-center justify-center cursor-pointer disabled:opacity-20 disabled:pointer-events-none disabled:transform-none disabled:shadow-none flex-shrink-0"
+                              title="تقليل النقص / تراجع"
                             >
-                              <Plus className="w-8 h-8" />
-                            </Button>
+                              <Minus className="w-8 h-8 sm:w-9 sm:h-9 stroke-[3]" />
+                              <span className="text-[10px] font-black mt-1">تراجع (-1)</span>
+                            </button>
+                            
+                            {/* Display Center Container */}
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center shadow-sm">
+                                <span className="text-3xl sm:text-4xl font-black text-slate-900 leading-none">
+                                  {juzScores[juzIdx]?.positionErrors[posIdx] || 0}
+                                </span>
+                              </div>
+                              <span className="text-[10px] sm:text-xs text-slate-500 font-black mt-2">مقدار النقص</span>
+                            </div>
+
+                            {/* Plus Button (Increases penalty/error count - adds mistake) */}
+                            <button
+                              type="button"
+                              onClick={() => adjustPositionDeduction(juzIdx, posIdx, 1)}
+                              className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white font-bold rounded-2xl border-2 border-b-[6px] border-emerald-700 hover:border-emerald-500 active:border-b-2 active:translate-y-1 shadow-md hover:shadow-lg active:shadow-sm transition-all duration-75 flex flex-col items-center justify-center cursor-pointer flex-shrink-0"
+                              title="إضافة نقص / رصد خطأ"
+                            >
+                              <Plus className="w-8 h-8 sm:w-9 sm:h-9 stroke-[3]" />
+                              <span className="text-[10px] font-black mt-1">دقة خطأ (+1)</span>
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -465,26 +472,37 @@ export default function JudgeDashboard() {
                           <span className="font-bold text-sm sm:text-base text-emerald-900">موضع التجويد</span>
                           <Star className="w-4 h-4 text-emerald-600 fill-emerald-600" />
                         </div>
-                        <div className="flex items-center justify-between bg-white p-1.5 sm:p-2 rounded-xl border border-emerald-200">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-600"
+                        <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-emerald-200 gap-4">
+                          {/* Minus Button for Tajweed Score */}
+                          <button
+                            type="button"
                             onClick={() => adjustTajweed(juzIdx, -1)}
                             disabled={(juzScores[juzIdx]?.tajweedScore || 0) <= 0}
+                            className="w-12 h-12 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl border-2 border-b-4 border-slate-300 hover:border-slate-400 active:border-b-2 active:translate-y-0.5 shadow-sm active:shadow-none transition-all duration-75 flex flex-col items-center justify-center cursor-pointer disabled:opacity-20 disabled:pointer-events-none"
+                            title="تقليل العلامة"
                           >
-                            <Minus className="w-5 h-5 sm:w-6 sm:h-6" />
-                          </Button>
-                          <span className="text-2xl sm:text-3xl font-bold text-emerald-900">{juzScores[juzIdx]?.tajweedScore || 0}</span>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-600"
+                            <Minus className="w-5 h-5 stroke-[3]" />
+                            <span className="text-[8px] font-bold mt-0.5">نقصان</span>
+                          </button>
+                          
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="text-2xl sm:text-3xl font-black text-emerald-950 leading-none">
+                              {juzScores[juzIdx]?.tajweedScore || 0}
+                            </span>
+                            <span className="text-[8px] text-emerald-600/80 font-bold mt-1">الدرجة</span>
+                          </div>
+
+                          {/* Plus Button for Tajweed Score */}
+                          <button
+                            type="button"
                             onClick={() => adjustTajweed(juzIdx, 1)}
                             disabled={(juzScores[juzIdx]?.tajweedScore || 0) >= 5}
+                            className="w-12 h-12 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white font-bold rounded-xl border-2 border-b-4 border-emerald-700 hover:border-emerald-500 active:border-b-2 active:translate-y-0.5 shadow-sm active:shadow-none transition-all duration-75 flex flex-col items-center justify-center cursor-pointer disabled:opacity-20 disabled:pointer-events-none"
+                            title="زيادة العلامة"
                           >
-                            <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
-                          </Button>
+                            <Plus className="w-5 h-5 stroke-[3]" />
+                            <span className="text-[8px] font-bold mt-0.5">زيادة</span>
+                          </button>
                         </div>
                         <p className="text-center text-[9px] sm:text-[10px] text-emerald-600 font-bold uppercase">الدرجة من 5</p>
                       </div>
