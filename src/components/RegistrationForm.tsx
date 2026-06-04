@@ -20,7 +20,7 @@ export default function RegistrationForm() {
     civil_id: "",
     phone: "",
     town: "",
-    gender: "male",
+    gender: "",
     level_id: ""
   });
   const [formData, setFormData] = useState({
@@ -28,7 +28,7 @@ export default function RegistrationForm() {
     civil_id: "",
     phone: "",
     town: "",
-    gender: "male",
+    gender: "",
     level_id: "",
   });
 
@@ -51,6 +51,10 @@ export default function RegistrationForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.gender) {
+      toast.error("يرجى اختيار الجنس");
+      return;
+    }
     if (!formData.level_id) {
       toast.error("يرجى اختيار مستوى الحفظ");
       return;
@@ -70,7 +74,7 @@ export default function RegistrationForm() {
       const data = await res.json();
       if (res.ok) {
         toast.success("تم التسجيل بنجاح!");
-        setFormData({ name: "", civil_id: "", phone: "", town: "", gender: "male", level_id: "" });
+        setFormData({ name: "", civil_id: "", phone: "", town: "", gender: "", level_id: "" });
         fetchData(); // Refresh table
       } else {
         toast.error(data.error || "حدث خطأ أثناء التسجيل");
@@ -209,7 +213,9 @@ export default function RegistrationForm() {
                   onValueChange={(val) => setFormData({ ...formData, gender: val })}
                 >
                   <SelectTrigger id="gender">
-                    <SelectValue placeholder="اختر الجنس" />
+                    <SelectValue placeholder="اختر الجنس">
+                      {formData.gender === "male" ? "ذكر" : formData.gender === "female" ? "أنثى" : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="male">ذكر</SelectItem>
@@ -226,7 +232,11 @@ export default function RegistrationForm() {
                 onValueChange={(val) => setFormData({ ...formData, level_id: val })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="اختر المستوى" />
+                  <SelectValue placeholder="اختر المستوى">
+                    {formData.level_id 
+                      ? (competition.levels.find((l: any) => l.id.toString() === formData.level_id)?.name || "اختر المستوى") 
+                      : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {competition.levels.map((level: any) => (
@@ -306,7 +316,11 @@ export default function RegistrationForm() {
                             onValueChange={(val) => setEditData({ ...editData, level_id: val })}
                           >
                             <SelectTrigger className="h-9 text-sm">
-                              <SelectValue />
+                              <SelectValue>
+                                {editData.level_id 
+                                  ? (competition.levels.find((l: any) => l.id.toString() === editData.level_id)?.name || "اختر المستوى")
+                                  : undefined}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               {competition.levels.map((l: any) => (

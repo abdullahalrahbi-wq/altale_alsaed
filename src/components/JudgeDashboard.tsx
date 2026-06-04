@@ -281,7 +281,9 @@ export default function JudgeDashboard() {
               <div className="mt-4">
                 <Select value={genderFilter} onValueChange={setGenderFilter}>
                   <SelectTrigger className="bg-white h-9">
-                    <SelectValue placeholder="تصفية حسب الجنس" />
+                    <SelectValue placeholder="تصفية حسب الجنس">
+                      {genderFilter === "all" ? "الكل" : genderFilter === "male" ? "ذكور" : genderFilter === "female" ? "إناث" : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">الكل</SelectItem>
@@ -347,7 +349,9 @@ export default function JudgeDashboard() {
                     </Label>
                     <Select value={judgeId} onValueChange={setJudgeId}>
                       <SelectTrigger className={`mt-1 bg-white border-amber-200 h-10 ${completedJudges.some(id => Number(id) === parseInt(judgeId)) ? "ring-2 ring-red-500 border-red-500" : ""}`}>
-                        <SelectValue />
+                        <SelectValue>
+                          {judgeId === "1" ? "المقيم الأول" : judgeId === "2" ? "المقيم الثاني" : "اختر رقم المقيم"}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="1" disabled={completedJudges.some(id => Number(id) === 1)}>

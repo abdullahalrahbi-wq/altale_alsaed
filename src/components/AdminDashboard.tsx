@@ -683,7 +683,9 @@ export default function AdminDashboard() {
                               onValueChange={(val) => setEditContestantData({ ...editContestantData, gender: val })}
                             >
                               <SelectTrigger className="h-8">
-                                <SelectValue />
+                                <SelectValue>
+                                  {editContestantData.gender === "male" ? "ذكر" : editContestantData.gender === "female" ? "أنثى" : "اختر الجنس"}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="male">ذكر</SelectItem>
