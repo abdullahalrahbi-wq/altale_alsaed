@@ -151,6 +151,31 @@ export default function JudgeDashboard() {
     });
   };
 
+  const setPositionUnmemorized = (juzIdx: number, posIdx: number) => {
+    setJuzScores(prev => {
+      const current = prev[juzIdx];
+      if (!current) return prev;
+      
+      const newErrors = [...current.positionErrors];
+      const currentDeduction = newErrors[posIdx] || 0;
+      
+      // If currently exactly 19, toggle back to 0. Otherwise set to exactly 19.
+      const newDeduction = currentDeduction === 19 ? 0 : 19;
+      const diff = newDeduction - currentDeduction;
+      
+      newErrors[posIdx] = newDeduction;
+      
+      return {
+        ...prev,
+        [juzIdx]: {
+          ...current,
+          deductions: current.deductions + diff,
+          positionErrors: newErrors
+        }
+      };
+    });
+  };
+
   const adjustTajweed = (juzIdx: number, amount: number) => {
     setJuzScores(prev => {
       const current = prev[juzIdx];
@@ -425,12 +450,33 @@ export default function JudgeDashboard() {
                     <div className="grid grid-cols-1 gap-3 sm:gap-4">
                       {Array.from({ length: selectedContestant.positions_count || 5 }).map((_, posIdx) => (
                         <div key={posIdx} className="p-3 sm:p-4 bg-white border border-slate-200 rounded-xl sm:rounded-2xl shadow-sm space-y-3 sm:space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-sm sm:text-base text-slate-700">الموضع {posIdx + 1}</span>
+                          <div className="flex justify-between items-center gap-4">
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-sm sm:text-base text-slate-700">الموضع {posIdx + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => setPositionUnmemorized(juzIdx, posIdx)}
+                                className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-black transition-all duration-150 border-2 flex items-center gap-1.5 cursor-pointer select-none ${
+                                  (juzScores[juzIdx]?.positionErrors[posIdx] || 0) === 19
+                                    ? "bg-rose-600 border-rose-700 hover:bg-rose-700 text-white shadow-md"
+                                    : "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200 hover:border-amber-300 active:bg-amber-200"
+                                }`}
+                                title="لم يحفظ الموضع بالكامل (خصم 19 درجة)"
+                              >
+                                <span>لم يحفظ (-19 درجة)</span>
+                                {(juzScores[juzIdx]?.positionErrors[posIdx] || 0) === 19 && (
+                                  <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                                )}
+                              </button>
+                            </div>
                             <div className="flex items-center gap-2">
                               {(juzScores[juzIdx]?.positionErrors[posIdx] || 0) > 0 && (
-                                <div className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                  تنبيه: يوجد نقص في هذا الموضع
+                                <div className={`text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-full ${
+                                  juzScores[juzIdx]?.positionErrors[posIdx] === 19
+                                    ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                    : "bg-red-100 text-red-700"
+                                }`}>
+                                  {juzScores[juzIdx]?.positionErrors[posIdx] === 19 ? "لم يحفظ بالكامل (-19)" : `خصم في هذا الموضع: -${juzScores[juzIdx]?.positionErrors[posIdx]}`}
                                 </div>
                               )}
                             </div>
