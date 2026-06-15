@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Award, User, CheckCircle2, Loader2, Star, Minus, Plus, RotateCcw, LogOut } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
 export default function JudgeDashboard() {
   const [contestants, setContestants] = useState<any[]>([]);
@@ -41,6 +42,7 @@ export default function JudgeDashboard() {
 
   const [genderFilter, setGenderFilter] = useState<string>("all");
   const [completedJudges, setCompletedJudges] = useState<number[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Specific scoring state per Juz
   const [juzScores, setJuzScores] = useState<Record<number, { 
@@ -200,6 +202,21 @@ export default function JudgeDashboard() {
     ? Object.keys(juzScores).reduce((acc, idx) => acc + calculateJuzTotal(parseInt(idx)), 0) / Object.keys(juzScores).length
     : 0;
 
+  const handleInitiateSubmit = () => {
+    if (!judgeId || !judgeName || !judgePhone) {
+      toast.error("يرجى إكمال بيانات المقيم (الرقم، الاسم، الهاتف)");
+      return;
+    }
+
+    const numericJudgeId = parseInt(judgeId);
+    if (completedJudges.some(id => Number(id) === numericJudgeId)) {
+      toast.error(`⚠️ تنبيه: لقد رصد المقيم ${numericJudgeId === 1 ? "الأول" : "الثاني"} درجات هذا المتسابق بالفعل! يرجى اختيار رقم المقيم الآخر لمتابعة رصد الدرجات.`);
+      return;
+    }
+
+    setShowConfirmDialog(true);
+  };
+
   const handleSubmitEvaluation = async () => {
     if (!judgeId || !judgeName || !judgePhone) {
       toast.error("يرجى إكمال بيانات المقيم (الرقم، الاسم، الهاتف)");
@@ -246,6 +263,7 @@ export default function JudgeDashboard() {
       if (res.ok) {
         toast.success("تم إرسال التقييم بنجاح");
         setSelectedContestant(null);
+        setShowConfirmDialog(false);
         fetchContestants();
       } else {
         const errorData = await res.json().catch(() => ({}));
@@ -565,7 +583,7 @@ export default function JudgeDashboard() {
               </CardContent>
               <CardFooter className="bg-slate-50 border-t border-slate-100 py-4 sm:py-6">
                 <Button
-                  onClick={handleSubmitEvaluation}
+                  onClick={handleInitiateSubmit}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-5 sm:py-6 text-base sm:text-lg"
                   disabled={submitting}
                 >
@@ -591,6 +609,104 @@ export default function JudgeDashboard() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {showConfirmDialog && selectedContestant && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !submitting && setShowConfirmDialog(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xs"
+            />
+            
+            {/* Center Modal Container */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              className="relative bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-slate-200 z-10 flex flex-col gap-5 text-right font-sans"
+              dir="rtl"
+            >
+              <div>
+                <h3 className="text-xl font-black text-emerald-950 flex items-center gap-2 mb-1">
+                  <Award className="w-6 h-6 text-emerald-600" />
+                  ملخص تقييم المتسابق
+                </h3>
+                <p className="text-xs text-slate-500">يرجى مراجعة درجات المتسابق قبل الحفظ النهائي والاعتماد</p>
+              </div>
+
+              {/* Contestant Info */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 font-bold">اسم المتسابق:</span>
+                  <span className="font-extrabold text-slate-900 text-sm">{selectedContestant.name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 font-bold">مستوى الحفظ:</span>
+                  <span className="font-medium text-slate-700 text-xs">{selectedContestant.level_name}</span>
+                </div>
+              </div>
+
+              {/* score list */}
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">درجات الأجزاء:</h4>
+                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                  {Array.from({ length: selectedContestant.juz_count || 1 }).map((_, juzIdx) => {
+                    const juzTotal = calculateJuzTotal(juzIdx);
+                    return (
+                      <div key={juzIdx} className="flex justify-between items-center py-2.5 px-4 bg-slate-50 rounded-xl border border-slate-100 hover:bg-slate-100 transition-colors">
+                        <span className="font-extrabold text-slate-700 text-sm">الجزء {juzIdx + 1}</span>
+                        <span className="font-black text-emerald-700 text-sm">{juzTotal.toFixed(1)} / 100</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* final total */}
+              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex justify-between items-center">
+                <span className="font-extrabold text-emerald-950 text-sm">المتوسط النهائي:</span>
+                <span className="font-black text-emerald-900 text-lg">{finalTotalScore.toFixed(2)} / 100</span>
+              </div>
+
+              {/* confirm message */}
+              <div className="text-center py-1">
+                <p className="font-extrabold text-slate-800 text-base">هل تريد إعتماد التقييم؟</p>
+                <p className="text-[10px] text-amber-600 font-bold mt-1">عند الضغط على نعم، سيتم رصد التقييم ولا يمكن التعديل عليه لاحقاً.</p>
+              </div>
+
+              {/* actions */}
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <Button
+                  onClick={handleSubmitEvaluation}
+                  disabled={submitting}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl cursor-pointer"
+                >
+                  {submitting ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>جاري الاعتماد...</span>
+                    </div>
+                  ) : (
+                    "نعم"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirmDialog(false)}
+                  disabled={submitting}
+                  className="border-slate-200 text-slate-600 hover:bg-slate-50 font-bold py-3 rounded-2xl cursor-pointer"
+                >
+                  إلغاء
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
