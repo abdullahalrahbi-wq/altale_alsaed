@@ -334,22 +334,28 @@ export default function RegistrationForm() {
             </div>
 
             <div className="space-y-2">
-              <Label>مستوى الحفظ</Label>
+              <Label className="text-slate-700 font-bold">مستوى الحفظ</Label>
               <Select
                 value={formData.level_id}
                 onValueChange={(val) => setFormData({ ...formData, level_id: val })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full text-right h-auto min-h-12 py-3 px-4 whitespace-normal flex items-center gap-2 text-slate-900 border-slate-200 bg-white font-extrabold text-sm leading-relaxed rounded-xl focus:ring-2 focus:ring-emerald-500">
                   <SelectValue placeholder="اختر المستوى">
-                    {formData.level_id 
-                      ? (competition.levels.find((l: any) => l.id.toString() === formData.level_id)?.name || "اختر المستوى") 
-                      : undefined}
+                    {formData.level_id ? (() => {
+                      const selectedLevel = competition.levels?.find((l: any) => l.id.toString() === formData.level_id);
+                      return selectedLevel 
+                        ? `${selectedLevel.name} - ${selectedLevel.description || ""}` 
+                        : "اختر المستوى";
+                    })() : undefined}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-w-[95vw]">
                   {competition.levels.map((level: any) => (
                     <SelectItem key={level.id} value={level.id.toString()}>
-                      {level.name} - {level.description}
+                      <div className="text-right py-0.5">
+                        <span className="font-extrabold text-slate-900 block">{level.name}</span>
+                        <span className="text-[11px] text-slate-500 font-medium block mt-0.5">{level.description}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -423,16 +429,24 @@ export default function RegistrationForm() {
                             value={editData.level_id} 
                             onValueChange={(val) => setEditData({ ...editData, level_id: val })}
                           >
-                            <SelectTrigger className="h-9 text-sm">
+                            <SelectTrigger className="h-auto min-h-9 py-1.5 text-xs whitespace-normal text-right">
                               <SelectValue>
-                                {editData.level_id 
-                                  ? (competition.levels.find((l: any) => l.id.toString() === editData.level_id)?.name || "اختر المستوى")
-                                  : undefined}
+                                {editData.level_id ? (() => {
+                                  const selectedL = competition.levels?.find((l: any) => l.id.toString() === editData.level_id);
+                                  return selectedL 
+                                    ? `${selectedL.name} - ${selectedL.description || ""}` 
+                                    : "اختر المستوى";
+                                })() : undefined}
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               {competition.levels.map((l: any) => (
-                                <SelectItem key={l.id} value={l.id.toString()}>{l.name}</SelectItem>
+                                <SelectItem key={l.id} value={l.id.toString()}>
+                                  <div className="text-right py-0.5">
+                                    <span className="font-extrabold text-slate-900 block">{l.name}</span>
+                                    <span className="text-[10px] text-slate-400 font-medium block">{l.description}</span>
+                                  </div>
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
