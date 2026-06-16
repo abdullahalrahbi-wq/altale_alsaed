@@ -32,6 +32,59 @@ export default function RegistrationForm() {
     level_id: "",
   });
 
+  // Intel Search States for Excel Pre-Registrations
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const handleSearchChange = async (val: string) => {
+    setSearchQuery(val);
+    if (!val.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/imported-contestants/search?competition_id=${competition?.id}&q=${encodeURI(val)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data);
+      }
+    } catch (e) {
+      console.error("Error searching imported contestants", e);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectPreRegistered = (item: any) => {
+    // Try to find if level_name matches any level in competition.levels:
+    let matchedLevelId = "";
+    if (item.level_name) {
+      const matchedLevel = competition.levels?.find((l: any) => 
+        l.name.toLowerCase().includes(item.level_name.toLowerCase()) || 
+        item.level_name.toLowerCase().includes(l.name.toLowerCase())
+      );
+      if (matchedLevel) {
+        matchedLevelId = matchedLevel.id.toString();
+      }
+    }
+
+    setFormData({
+      name: item.name,
+      civil_id: item.civil_id,
+      phone: item.phone,
+      town: item.town,
+      gender: item.gender === "female" ? "female" : "male",
+      level_id: matchedLevelId
+    });
+
+    setSearchQuery("");
+    setSearchResults([]);
+    toast.success(`تم استدعاء بيانات المتسابق "${item.name}" تلقائياً! يرجى التحقق من الحقول ثم تأكيد التسجيل.`);
+  };
+
   const fetchData = () => {
     fetch("/api/competition/active")
       .then((res) => res.json())
@@ -165,6 +218,61 @@ export default function RegistrationForm() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6 pt-6">
+            {/* Intelligent Pre-registrants Search Section */}
+            <div className="bg-emerald-50/50 p-5 border border-emerald-100 rounded-2xl space-y-3 relative">
+              <Label className="text-emerald-950 font-bold block text-sm flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                البحث وعرض بيانات المتسابقين (الملف المستورد)
+              </Label>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                مسجل البيانات: ابحث عن اسم المتسابق أو رقمه المدني أدناه، وعند اختياره ستكتمل بياناته تلقائياً في الخانات ومستوى الفئة الحالي. تأكد منها ثم اضغط "تأكيد التسجيل".
+              </p>
+              
+              <div className="relative">
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="ابحث بالاسم أو الرقم المدني (مثلاً: علي...)"
+                  className="bg-white border-slate-200 pl-10 pr-4 py-2.5 h-11 text-sm focus-visible:ring-emerald-500 rounded-xl"
+                />
+                
+                {searching && (
+                  <div className="absolute left-3 top-3.5">
+                    <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                  </div>
+                )}
+              </div>
+
+              {/* Suggestions dropdown */}
+              {searchResults.length > 0 && (
+                <div className="absolute left-4 right-4 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-100 p-1">
+                  {searchResults.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSelectPreRegistered(item)}
+                      className="w-full text-right px-4 py-3 hover:bg-emerald-50/50 transition-colors duration-150 flex flex-col gap-1 items-start cursor-pointer rounded-xl first:mt-0 mt-0.5"
+                    >
+                      <span className="font-extrabold text-slate-900 text-sm">{item.name}</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-0.5 font-mono">
+                        {item.civil_id && <span>الرقم المدني: {item.civil_id}</span>}
+                        {item.phone && <span>الهاتف: {item.phone}</span>}
+                        {item.level_name && (
+                          <Badge variant="outline" className="font-sans text-[10px] bg-emerald-50 text-emerald-800 border-emerald-100 font-bold">
+                            المستوى المتوقع: {item.level_name}
+                          </Badge>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {searchQuery && !searching && searchResults.length === 0 && (
+                <p className="text-xs text-amber-600 font-medium mt-1">لا توجد نتائج بحث مطابقة في قائمة الأسماء المستوردة</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="name">الاسم الكامل</Label>

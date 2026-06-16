@@ -86,6 +86,19 @@ db.exec(`
     password TEXT NOT NULL,
     role TEXT NOT NULL -- 'admin' or 'judge'
   );
+
+  CREATE TABLE IF NOT EXISTS imported_contestants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    civil_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    town TEXT NOT NULL,
+    gender TEXT, -- 'male' or 'female'
+    level_name TEXT,
+    competition_id INTEGER,
+    registered INTEGER DEFAULT 0,
+    FOREIGN KEY(competition_id) REFERENCES competitions(id)
+  );
 `);
 
 // Migrations for existing databases
@@ -116,6 +129,23 @@ try {
 } catch (e) {}
 try {
   db.prepare("ALTER TABLE evaluations ADD COLUMN judge_phone TEXT").run();
+} catch (e) {}
+
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS imported_contestants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      civil_id TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      town TEXT NOT NULL,
+      gender TEXT,
+      level_name TEXT,
+      competition_id INTEGER,
+      registered INTEGER DEFAULT 0,
+      FOREIGN KEY(competition_id) REFERENCES competitions(id)
+    );
+  `);
 } catch (e) {}
 
 // Seed initial admin if not exists
@@ -239,6 +269,16 @@ async function startServer() {
         INSERT INTO contestants (name, civil_id, phone, town, gender, competition_id, level_id)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(name, civil_id, phone, town, gender, competition_id, level_id);
+      
+      // Also mark as registered in imported_contestants if exists
+      try {
+        db.prepare(`
+          UPDATE imported_contestants
+          SET registered = 1
+          WHERE civil_id = ? AND competition_id = ?
+        `).run(String(civil_id), competition_id);
+      } catch (e) {}
+
       res.json({ id: result.lastInsertRowid });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -387,6 +427,99 @@ async function startServer() {
       LIMIT 10
     `).all();
     res.json(registrations);
+  });
+
+  // Search imported contestants
+  app.get("/api/imported-contestants/search", (req, res) => {
+    const q = req.query.q as string;
+    const competition_id = req.query.competition_id as string;
+    if (!q) {
+      return res.json([]);
+    }
+    try {
+      const results = db.prepare(`
+        SELECT * FROM imported_contestants
+        WHERE competition_id = ? AND registered = 0 AND (name LIKE ? OR civil_id LIKE ?)
+        LIMIT 15
+      `).all(competition_id, `%${q}%`, `%${q}%`);
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Import contestants to a competition
+  app.post("/api/admin/competitions/:id/import", (req, res) => {
+    const { id } = req.params;
+    const contestantsList = req.body; // array of { name, civil_id, phone, town, gender, level_name }
+    
+    if (!Array.isArray(contestantsList)) {
+      return res.status(400).json({ error: "بيانات الاستيراد يجب أن تكون مصفوفة" });
+    }
+
+    try {
+      const insert = db.prepare(`
+        INSERT INTO imported_contestants (name, civil_id, phone, town, gender, level_name, competition_id, registered)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+      `);
+
+      const transaction = db.transaction((rows) => {
+        for (const row of rows) {
+          let gender = "";
+          const gStr = String(row.gender || "").trim();
+          if (gStr === "أنثى" || gStr === "female") {
+            gender = "female";
+          } else if (gStr === "ذكر" || gStr === "male") {
+            gender = "male";
+          } else {
+            gender = gStr;
+          }
+          
+          insert.run(
+            String(row.name || "").trim(),
+            String(row.civil_id || "").trim(),
+            String(row.phone || "").trim(),
+            String(row.town || "").trim(),
+            gender,
+            String(row.level_name || "").trim(),
+            id
+          );
+        }
+      });
+
+      transaction(contestantsList);
+      res.json({ success: true, count: contestantsList.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get stats for imported contestants
+  app.get("/api/admin/competitions/:id/imported-stats", (req, res) => {
+    const { id } = req.params;
+    try {
+      const stats = db.prepare(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(case when registered = 1 then 1 else 0 end) as registered_count
+        FROM imported_contestants
+        WHERE competition_id = ?
+      `).get(id) as { total: number; registered_count: number };
+      res.json(stats || { total: 0, registered_count: 0 });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Delete all imported contestants for a competition
+  app.delete("/api/admin/competitions/:id/imported", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("DELETE FROM imported_contestants WHERE competition_id = ?").run(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Admin: Create competition

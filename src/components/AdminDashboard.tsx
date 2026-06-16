@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { BarChart3, Plus, Trash2, Download, Settings, Users, FileText, Loader2, Trophy, CheckCircle, Edit2, Save, X } from "lucide-react";
+import { BarChart3, Plus, Trash2, Download, Settings, Users, FileText, Loader2, Trophy, CheckCircle, Edit2, Save, X, UploadCloud, RefreshCw } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import * as XLSX from "xlsx";
 
 export default function AdminDashboard() {
   const [results, setResults] = useState<any[]>([]);
@@ -45,6 +46,152 @@ export default function AdminDashboard() {
   });
 
   const [isMounted, setIsMounted] = useState(false);
+
+  // Excel Import States
+  const [importStats, setImportStats] = useState<{ total: number; registered_count: number }>({ total: 0, registered_count: 0 });
+  const [parsedPreview, setParsedPreview] = useState<any[]>([]);
+  const [importLoading, setImportLoading] = useState(false);
+
+  const fetchImportStats = (compId: number) => {
+    fetch(`/api/admin/competitions/${compId}/imported-stats`)
+      .then(res => res.json())
+      .then(data => setImportStats(data))
+      .catch(err => console.error("Error fetching import stats", err));
+  };
+
+  useEffect(() => {
+    if (competition?.id) {
+      fetchImportStats(competition.id);
+      setParsedPreview([]); // reset when switching
+    }
+  }, [competition]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        if (!bstr) return;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+        const headers = (data[0] as any[]) || [];
+        const rows = data.slice(1) as any[][];
+
+        const getIndex = (keywords: string[]) => {
+          return headers.findIndex(h => 
+            keywords.some(kw => String(h || "").toLowerCase().includes(kw))
+          );
+        };
+
+        const nameIdx = getIndex(["الاسم", "name", "كامل", "متسابق", "عضو"]);
+        const civilIdx = getIndex(["مدني", "civil", "بطاقة", "شخصية", "رقم مدني"]);
+        const phoneIdx = getIndex(["هاتف", "phone", "تلفون", "جوال"]);
+        const townIdx = getIndex(["بلدة", "town", "قرية", "عنوان", "بلد"]);
+        const genderIdx = getIndex(["جنس", "gender", "نوع", "ذكر", "أنثى"]);
+        const levelIdx = getIndex(["مستوى", "level", "فئة", "جزء"]);
+
+        if (nameIdx === -1 && civilIdx === -1) {
+          toast.error("لم نتمكن من العثور على أعمدة 'الاسم' أو 'الرقم المدني' في ملف الأكسل. يرجى التأكد من كتابة مسميات الأعمدة في السطر الأول.");
+          return;
+        }
+
+        const formatted: any[] = [];
+        rows.forEach((row) => {
+          if (!row || row.length === 0 || !row[nameIdx]) return;
+
+          const nVal = String(row[nameIdx] || "").trim();
+          const cVal = String(row[civilIdx] || "").trim();
+          const pVal = String(row[phoneIdx] || "").trim();
+          const tVal = String(row[townIdx] || "").trim();
+          const lVal = String(row[levelIdx] || "").trim();
+          
+          let gVal = "male";
+          const gRaw = String(row[genderIdx] || "").trim();
+          if (gRaw.includes("أنثى") || gRaw.toLowerCase().includes("female") || gRaw.toLowerCase().includes("f")) {
+            gVal = "female";
+          }
+
+          formatted.push({
+            name: nVal,
+            civil_id: cVal,
+            phone: pVal,
+            town: tVal,
+            gender: gVal,
+            level_name: lVal
+          });
+        });
+
+        if (formatted.length === 0) {
+          toast.error("الملف لا يحتوي على سجلات صالحة.");
+          return;
+        }
+
+        setParsedPreview(formatted);
+        toast.success(`تم استخراج ${formatted.length} سجل بنجاح من ملف الأكسل. يرجى مراجعة الجدول في الأسفل وحفظ البيانات.`);
+      } catch (error) {
+        console.error(error);
+        toast.error("حدث خطأ أثناء قراءة ملف الأكسل. تأكد من جودة وصحة ترميز الملف.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    // Reset file input target value to allow re-selection of the same file
+    e.target.value = "";
+  };
+
+  const handleSaveImport = async () => {
+    if (!competition?.id) return;
+    if (parsedPreview.length === 0) return;
+
+    setImportLoading(true);
+    try {
+      const res = await fetch(`/api/admin/competitions/${competition.id}/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsedPreview)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`تم استيراد ${data.count} متسابق بنجاح في قاعدة بيانات ما قبل التسجيل للمسابقة.`);
+        fetchImportStats(competition.id);
+        setParsedPreview([]);
+      } else {
+        toast.error(data.error || "فشل استيراد الأسماء");
+      }
+    } catch (e) {
+      toast.error("تعذر الاتصال بالخادم لمزامنة الأسماء");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleClearImport = async () => {
+    if (!competition?.id) return;
+    if (!window.confirm("هل أنت متأكد من مسح كافة الأسماء المستوردة من الأكسل لهذه المسابقة؟")) return;
+
+    setImportLoading(true);
+    try {
+      const res = await fetch(`/api/admin/competitions/${competition.id}/imported`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        toast.success("تم مسح تجميعة الأسماء المستوردة بنجاح لرصيد هذه المسابقة.");
+        fetchImportStats(competition.id);
+        setParsedPreview([]);
+      } else {
+        toast.error("فشل تفريغ الأسماء المستوردة");
+      }
+    } catch (e) {
+      toast.error("خطأ أثناء الاتصال بالخادم لمسح الملف المستورد");
+    } finally {
+      setImportLoading(false);
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -963,6 +1110,114 @@ export default function AdminDashboard() {
                           <p className="text-xl font-bold text-slate-900">#{competition.id}</p>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Excel Registration Import Tool */}
+                    <div className="pt-6 border-t border-slate-100 space-y-4">
+                      <h4 className="font-extrabold text-emerald-900 flex items-center gap-2 text-base">
+                        <UploadCloud className="w-5 h-5 text-emerald-600" />
+                        أداة استيراد الأسماء من ملف الأكسل (مسجلين مسبقاً)
+                      </h4>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        قم برفع الأسماء لتكون جاهزة للمطابقة والبحث أثناء تسجيل المتسابقين في صفحة الاستقبال. لن تظهر هذه الأسماء للمقيم في لجنة التحكيم إلا بعد تأكيد التسجيل يدوياً.
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col justify-between">
+                          <div>
+                            <span className="text-xs text-slate-400 font-bold">إحصائيات الاستيراد الحالية:</span>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm font-bold text-slate-700">عدد الأسماء المستوردة: <span className="font-black text-emerald-700 text-base">{importStats.total || 0}</span></p>
+                              <p className="text-sm font-bold text-slate-700">الذين تم تسجيلهم رسمياً: <span className="font-black text-blue-600 text-base">{importStats.registered_count || 0}</span></p>
+                              <p className="text-sm font-bold text-slate-700">المتبقي في قائمة الانتظار: <span className="font-black text-amber-600 text-base">{(importStats.total || 0) - (importStats.registered_count || 0)}</span></p>
+                            </div>
+                          </div>
+                          {importStats.total > 0 && (
+                            <Button 
+                              onClick={handleClearImport} 
+                              disabled={importLoading}
+                              variant="outline" 
+                              size="sm" 
+                              className="mt-4 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 font-bold self-start cursor-pointer"
+                            >
+                              مسح الأسماء المستوردة
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="p-4 border-2 border-dashed border-emerald-200 rounded-2xl bg-emerald-50/20 flex flex-col items-center justify-center text-center gap-3">
+                          <UploadCloud className="w-8 h-8 text-emerald-500" />
+                          <div>
+                            <span className="text-sm font-bold text-emerald-950 block">اختر ملف الأكسل (.xlsx أو .xls)</span>
+                            <span className="text-[10px] text-slate-400">يجب أن يحتوي الملف على السطر الأول كأسماء للأعمدة (الاسم، الرقم المدني، الهاتف، البلدة، الجنس، الفئة)</span>
+                          </div>
+                          
+                          <label className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-4 py-2.5 rounded-xl cursor-pointer shadow-sm transition-all flex items-center gap-1.5 select-none hover:scale-105 active:scale-95 duration-100">
+                            <span>تصفح الملفات...</span>
+                            <input 
+                              type="file" 
+                              accept=".xlsx, .xls" 
+                              onChange={handleFileChange} 
+                              className="hidden" 
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Parsed Preview Table */}
+                      {parsedPreview.length > 0 && (
+                        <div className="space-y-3 bg-slate-50 p-4 rounded-3xl border border-slate-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div>
+                              <h5 className="font-bold text-slate-800 text-sm">معاينة الملف المرفوع</h5>
+                              <p className="text-[10px] text-slate-400">سيتم حفظ {parsedPreview.length} سجل في قائمة المسجلين مسبقاً</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button 
+                                onClick={handleSaveImport} 
+                                disabled={importLoading}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl cursor-pointer"
+                              >
+                                {importLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "مزامنة وحفظ الأسماء"}
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                onClick={() => setParsedPreview([])}
+                                className="text-slate-600 border-slate-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer"
+                              >
+                                إلغاء ومعاودة الرفع
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="max-h-60 overflow-y-auto block border border-slate-200 rounded-xl bg-white">
+                            <Table className="text-xs">
+                              <TableHeader className="bg-slate-50">
+                                <TableRow>
+                                  <TableHead className="text-right font-bold text-slate-600">م</TableHead>
+                                  <TableHead className="text-right font-bold text-slate-600">الاسم</TableHead>
+                                  <TableHead className="text-right font-bold text-slate-600">الرقم المدني</TableHead>
+                                  <TableHead className="text-right font-bold text-slate-600 font-mono">رقم الهاتف</TableHead>
+                                  <TableHead className="text-right font-bold text-slate-600">البلدة</TableHead>
+                                  <TableHead className="text-right font-bold text-slate-600">المستوى المتوقع</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {parsedPreview.map((item, idx) => (
+                                  <TableRow key={idx} className="hover:bg-slate-50">
+                                    <TableCell className="font-bold text-slate-400">{idx + 1}</TableCell>
+                                    <TableCell className="font-extrabold text-slate-900">{item.name}</TableCell>
+                                    <TableCell className="font-mono text-slate-600">{item.civil_id || "-"}</TableCell>
+                                    <TableCell className="font-mono text-slate-600">{item.phone || "-"}</TableCell>
+                                    <TableCell className="text-slate-600">{item.town || "-"}</TableCell>
+                                    <TableCell className="font-semibold text-emerald-800">{item.level_name || "-"}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
