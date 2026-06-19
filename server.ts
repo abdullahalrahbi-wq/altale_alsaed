@@ -288,14 +288,19 @@ async function startServer() {
   // Get contestants for judging
   app.get("/api/contestants", (req, res) => {
     const judgeId = req.query.judge_id || 0;
+    
+    // Fetch active competition ID
+    const activeComp = db.prepare("SELECT id FROM competitions WHERE active = 1 ORDER BY year DESC LIMIT 1").get() as any;
+    const activeCompId = activeComp?.id || 0;
+
     const contestants = db.prepare(`
       SELECT c.*, l.name as level_name, l.juz_count, l.positions_count,
         (SELECT COUNT(DISTINCT judge_id) FROM evaluations WHERE contestant_id = c.id) as judge_count,
         (SELECT COUNT(*) FROM evaluations WHERE contestant_id = c.id AND judge_id = ?) as already_judged_by_me
       FROM contestants c 
       JOIN levels l ON c.level_id = l.id
-      WHERE already_judged_by_me = 0
-    `).all(judgeId);
+      WHERE c.competition_id = ? AND already_judged_by_me = 0
+    `).all(judgeId, activeCompId);
     res.json(contestants);
   });
 
@@ -355,12 +360,19 @@ async function startServer() {
 
   // Get results for admin
   app.get("/api/results", (req, res) => {
+    let competitionId = req.query.competition_id;
+    if (!competitionId) {
+      const activeComp = db.prepare("SELECT id FROM competitions WHERE active = 1 ORDER BY year DESC LIMIT 1").get() as any;
+      competitionId = activeComp?.id || 0;
+    }
+
     // Complex calculation: Detailed scores per judge and juz
     const contestants = db.prepare(`
       SELECT c.*, l.name as level_name, l.juz_count, l.positions_count
       FROM contestants c
       JOIN levels l ON c.level_id = l.id
-    `).all() as any[];
+      WHERE c.competition_id = ?
+    `).all(competitionId) as any[];
 
     const results = contestants.map(c => {
       const evaluations = db.prepare(`
@@ -419,13 +431,17 @@ async function startServer() {
 
   // Get my registrations (recent)
   app.get("/api/my-registrations", (req, res) => {
+    const activeComp = db.prepare("SELECT id FROM competitions WHERE active = 1 ORDER BY year DESC LIMIT 1").get() as any;
+    const activeCompId = activeComp?.id || 0;
+
     const registrations = db.prepare(`
       SELECT c.*, l.name as level_name, l.positions_count
       FROM contestants c
       JOIN levels l ON c.level_id = l.id
+      WHERE c.competition_id = ?
       ORDER BY c.created_at DESC
       LIMIT 10
-    `).all();
+    `).all(activeCompId);
     res.json(registrations);
   });
 
