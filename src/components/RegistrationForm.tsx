@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { UserPlus, Loader2, Table as TableIcon, Edit2, Trash2, Save, X } from "lucide-react";
+import { UserPlus, Loader2, Table as TableIcon, Edit2, Trash2, Save, X, Home, LogOut } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export default function RegistrationForm() {
+interface RegistrationFormProps {
+  onGoHome?: () => void;
+  onLogout?: () => void;
+}
+
+export default function RegistrationForm({ onGoHome, onLogout }: RegistrationFormProps) {
   const [competition, setCompetition] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -207,7 +212,34 @@ export default function RegistrationForm() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-4">
+      {/* Mobile-Friendly Navigation Bar for Register View */}
+      <div className="flex justify-between items-center bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onGoHome}
+          className="flex items-center gap-2 border-slate-200 text-slate-700 font-bold px-4 py-2 h-10 rounded-xl text-xs hover:bg-slate-50 cursor-pointer bg-white"
+        >
+          <Home className="w-4 h-4 text-slate-500" />
+          <span>الصفحة الرئيسية</span>
+        </Button>
+        
+        <div className="text-center hidden sm:block">
+          <span className="text-xs font-bold text-slate-400">بوابة التسجيل</span>
+        </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onLogout}
+          className="flex items-center gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 font-bold px-4 py-2 h-10 rounded-xl text-xs cursor-pointer"
+        >
+          <LogOut className="w-4 h-4 text-red-500" />
+          <span>تسجيل الخروج</span>
+        </Button>
+      </div>
+
       <Card className="border-slate-200 shadow-sm">
         <CardHeader className="bg-emerald-50/50 border-b border-slate-100">
           <CardTitle className="text-2xl font-bold text-emerald-900 flex items-center gap-2">

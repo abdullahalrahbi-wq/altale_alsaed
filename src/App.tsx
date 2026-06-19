@@ -159,6 +159,16 @@ export default function App() {
     }
   };
 
+  const handleLogoutRegister = () => {
+    setUnlockedTabs(prev => {
+      const next = { ...prev };
+      delete next["register"];
+      return next;
+    });
+    setActiveTab("home");
+    toast.success("تم تسجيل الخروج بنجاح");
+  };
+
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-[#f5f5f0] font-sans text-slate-900 selection:bg-emerald-100" dir="rtl">
@@ -349,7 +359,12 @@ export default function App() {
                 </div>
               )}
 
-              {activeTab === "register" && <RegistrationForm />}
+              {activeTab === "register" && (
+                <RegistrationForm 
+                  onGoHome={() => setActiveTab("home")} 
+                  onLogout={handleLogoutRegister} 
+                />
+              )}
               {activeTab === "judge" && <JudgeDashboard />}
               {activeTab === "admin" && <AdminDashboard />}
             </div>
