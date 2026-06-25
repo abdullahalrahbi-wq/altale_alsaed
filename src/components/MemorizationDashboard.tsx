@@ -93,6 +93,40 @@ export default function MemorizationDashboard() {
 
   // Parent view stats
   const [parentData, setParentData] = useState<any>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+
+  const getFullRecordStatusText = (rec: any) => {
+    if (!rec) return "لم يبدأ";
+    const status = rec.record_status || rec.status || "لم يبدأ";
+    if (status === "لم يبدأ") return "لم يبدأ";
+
+    const parts = [];
+    if (status !== "لم يبدأ") {
+      parts.push(status);
+    }
+    
+    const isFirstDone = rec.first_recitation_done === 1 || rec.first_recitation_done === true;
+    const isSecondDone = rec.second_recitation_done === 1 || rec.second_recitation_done === true;
+
+    if (isFirstDone && status !== "تم التسميع الأول" && status !== "تم التسميع الثاني / مراجعة وتثبيت") {
+      parts.push("تم التسميع الأول");
+    }
+    
+    if (isSecondDone && status !== "تم التسميع الثاني / مراجعة وتثبيت") {
+      parts.push("تم التسميع الثاني");
+    }
+    
+    return parts.length > 0 ? parts.join(" و ") : "لم يبدأ";
+  };
+
+  const getRecordBadgeStyle = (statusText: string) => {
+    if (statusText === "لم يبدأ") return "bg-slate-100 text-slate-500";
+    if (statusText.includes("مراجعة وتثبيت") || statusText.includes("التسميع الثاني")) return "bg-green-100 text-green-800 border border-green-200";
+    if (statusText.includes("التسميع الأول")) return "bg-emerald-100 text-emerald-800 border border-emerald-200";
+    if (statusText.includes("تم الحفظ")) return "bg-teal-100 text-teal-800 border border-teal-200";
+    if (statusText.includes("جاري الحفظ")) return "bg-amber-100 text-amber-800 border border-amber-200";
+    return "bg-emerald-50 text-emerald-700 border border-emerald-100";
+  };
 
   // Supervisor student performance states
   const [supervisorProgramId, setSupervisorProgramId] = useState<string>("");
@@ -533,6 +567,7 @@ export default function MemorizationDashboard() {
 
   const openGroupStudents = (group: any) => {
     setSelectedGroup(group);
+    fetchStudents(); // Always load latest student list
     fetch(`/api/memorization/admin/groups/${group.id}/students`)
       .then(res => res.json())
       .then(data => {
@@ -1703,13 +1738,9 @@ export default function MemorizationDashboard() {
 
                               <div className="flex items-center gap-3">
                                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                                  rec.record_status === "تم التسميع الثاني / مراجعة وتثبيت" ? "bg-green-100 text-green-800" :
-                                  rec.record_status === "تم التسميع الأول" ? "bg-emerald-100 text-emerald-800" :
-                                  rec.record_status === "تم الحفظ" ? "bg-teal-100 text-teal-800" :
-                                  rec.record_status === "جاري الحفظ" ? "bg-amber-100 text-amber-800" :
-                                  "bg-slate-100 text-slate-600"
+                                  getRecordBadgeStyle(getFullRecordStatusText(rec))
                                 }`}>
-                                  {rec.record_status || "لم يبدأ"}
+                                  {getFullRecordStatusText(rec)}
                                 </span>
                                 {rec.mastery_level && (
                                   <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded">
@@ -2199,13 +2230,9 @@ export default function MemorizationDashboard() {
                                                 </td>
                                                 <td className="p-2.5">
                                                   <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                                                    rec.record_status === "تم التسميع الثاني / مراجعة وتثبيت" ? "bg-green-100 text-green-800" :
-                                                    rec.record_status === "تم التسميع الأول" ? "bg-emerald-100 text-emerald-800" :
-                                                    rec.record_status === "تم الحفظ" ? "bg-teal-100 text-teal-800" :
-                                                    rec.record_status === "جاري الحفظ" ? "bg-amber-100 text-amber-800" :
-                                                    "bg-slate-100 text-slate-500"
+                                                    getRecordBadgeStyle(getFullRecordStatusText(rec))
                                                   }`}>
-                                                    {rec.record_status || "لم يبدأ"}
+                                                    {getFullRecordStatusText(rec)}
                                                   </span>
                                                 </td>
                                                 <td className="p-2.5 text-slate-600">
@@ -2331,13 +2358,9 @@ export default function MemorizationDashboard() {
                             <td className="p-3">
                               <div className="space-y-1.5">
                                 <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
-                                  rec.record_status === "تم التسميع الثاني / مراجعة وتثبيت" ? "bg-green-100 text-green-800" :
-                                  rec.record_status === "تم التسميع الأول" ? "bg-emerald-100 text-emerald-800" :
-                                  rec.record_status === "تم الحفظ" ? "bg-teal-100 text-teal-800" :
-                                  rec.record_status === "جاري الحفظ" ? "bg-amber-100 text-amber-800" :
-                                  "bg-slate-100 text-slate-500"
+                                  getRecordBadgeStyle(getFullRecordStatusText(rec))
                                 }`}>
-                                  {rec.record_status || "لم يبدأ"}
+                                  {getFullRecordStatusText(rec)}
                                 </span>
                                 <div className="space-y-1 text-[11px] text-slate-500 bg-slate-50/55 p-2 rounded-xl border border-slate-100">
                                   <div className="flex items-center gap-1.5">
@@ -2467,9 +2490,22 @@ export default function MemorizationDashboard() {
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">اختيار طلاب من الدليل لإدراجهم:</h4>
                 
-                <div className="border border-slate-200 rounded-2xl divide-y divide-slate-100 bg-white max-h-[350px] overflow-y-auto">
+                <Input 
+                  type="text"
+                  placeholder="ابحث عن طالب بالاسم أو القرية..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="h-10 text-xs rounded-xl border-slate-200 focus:ring-emerald-500"
+                />
+
+                <div className="border border-slate-200 rounded-2xl divide-y divide-slate-100 bg-white max-h-[300px] overflow-y-auto">
                   {students
                     .filter(st => !selectedGroupStudents.some(cur => cur.id === st.id))
+                    .filter(st => {
+                      if (!studentSearch.trim()) return true;
+                      const query = studentSearch.toLowerCase();
+                      return st.name.toLowerCase().includes(query) || (st.village && st.village.toLowerCase().includes(query));
+                    })
                     .map((st) => (
                       <div key={st.id} className="p-3 flex justify-between items-center text-xs">
                         <div>
@@ -2485,8 +2521,12 @@ export default function MemorizationDashboard() {
                         </Button>
                       </div>
                     ))}
-                  {students.filter(st => !selectedGroupStudents.some(cur => cur.id === st.id)).length === 0 && (
-                    <p className="p-6 text-center text-slate-400 text-xs">تم إدراج كافة الطلاب المتاحين بالدليل.</p>
+                  {students.filter(st => !selectedGroupStudents.some(cur => cur.id === st.id)).filter(st => {
+                    if (!studentSearch.trim()) return true;
+                    const query = studentSearch.toLowerCase();
+                    return st.name.toLowerCase().includes(query) || (st.village && st.village.toLowerCase().includes(query));
+                  }).length === 0 && (
+                    <p className="p-6 text-center text-slate-400 text-xs">لا يوجد طلاب يطابقون البحث أو تم إدراجهم بالكامل.</p>
                   )}
                 </div>
               </div>

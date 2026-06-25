@@ -62,7 +62,8 @@ export default function App() {
   const [unlockedTabs, setUnlockedTabs] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem("unlocked_tabs");
-      return saved ? JSON.parse(saved) : { home: true, memorization: true };
+      const parsed = saved ? JSON.parse(saved) : {};
+      return { home: true, memorization: true, ...parsed };
     } catch {
       return { home: true, memorization: true };
     }
