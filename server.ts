@@ -293,7 +293,14 @@ try {
   const memoAdminExists = db.prepare("SELECT * FROM memo_users WHERE role = 'admin'").get();
   if (!memoAdminExists) {
     db.prepare("INSERT INTO memo_users (name, role, code, phone, status) VALUES (?, ?, ?, ?, ?)")
-      .run("إدارة التحفيظ والمتابعة", "admin", "admin77", "99998888", "active");
+      .run("إدارة التحفيظ والمتابعة", "admin", "admin2026", "99998888", "active");
+  } else {
+    // If admin already exists but with the old code, update it to admin2026
+    try {
+      db.prepare("UPDATE memo_users SET code = 'admin2026' WHERE role = 'admin' AND code = 'admin77'").run();
+    } catch (e) {
+      console.error("Failed to migrate admin77 to admin2026:", e);
+    }
   }
 
   // Pre-seed Quran sections with Juz 30 and Fatihah if table is empty
@@ -495,7 +502,7 @@ async function startServer() {
     const activeCompId = activeComp?.id || 0;
 
     const contestants = db.prepare(`
-      SELECT c.*, l.name as level_name, l.juz_count, l.positions_count,
+      SELECT c.*, l.name as level_name, l.description as level_description, l.juz_count, l.positions_count,
         (SELECT COUNT(DISTINCT judge_id) FROM evaluations WHERE contestant_id = c.id) as judge_count,
         (SELECT COUNT(*) FROM evaluations WHERE contestant_id = c.id AND judge_id = ?) as already_judged_by_me
       FROM contestants c 

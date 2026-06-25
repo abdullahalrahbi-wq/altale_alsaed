@@ -711,7 +711,7 @@ export default function MemorizationDashboard() {
               <div className="space-y-1">
                 <Input 
                   type="text" 
-                  placeholder="أدخل كود الدخول الخاص بك (مثال: admin77)..." 
+                  placeholder="أدخل كود الدخول الخاص بك..." 
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value)}
                   className="text-center text-xl font-bold tracking-wider h-14 rounded-2xl border-emerald-200 focus:ring-emerald-500 focus:border-emerald-500"
@@ -746,10 +746,6 @@ export default function MemorizationDashboard() {
                 <span className="block text-emerald-700">ولي الأمر</span>
                 <span className="font-normal text-slate-400">متابعة الإنجاز</span>
               </div>
-            </div>
-
-            <div className="text-xs text-slate-400">
-              * للتجربة الفورية كمسؤول، استخدم الكود: <code className="bg-slate-100 px-2 py-1 rounded text-emerald-700 font-black">admin77</code>
             </div>
           </div>
         </div>
@@ -883,7 +879,7 @@ export default function MemorizationDashboard() {
                           </p>
                         </div>
                         <div className="bg-white p-3 rounded-xl border border-amber-200 text-xs font-mono text-slate-600">
-                          كود دخول الإدارة: admin77
+                          كود دخول الإدارة: admin2026
                         </div>
                       </div>
                     </div>

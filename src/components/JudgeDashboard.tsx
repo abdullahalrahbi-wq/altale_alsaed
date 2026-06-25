@@ -443,6 +443,19 @@ export default function JudgeDashboard() {
                   </div>
                 </div>
 
+                {/* Required Quran Suras / Portions for this level */}
+                {selectedContestant.level_description && (
+                  <div className="bg-amber-50/50 p-4 sm:p-5 rounded-2xl border border-amber-200/60 space-y-2">
+                    <h4 className="text-sm font-black text-amber-900 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                      المقرر والحفظ المطلوب تسميعه للمتسابق:
+                    </h4>
+                    <p className="text-sm text-amber-850 font-bold leading-relaxed pr-4 whitespace-pre-line">
+                      {selectedContestant.level_description}
+                    </p>
+                  </div>
+                )}
+
                 {/* Loop through Juz */}
                 {Array.from({ length: selectedContestant.juz_count || 1 }).map((_, juzIdx) => (
                   <div key={juzIdx} className="space-y-4 sm:space-y-6 border-t border-slate-100 pt-6 sm:pt-8 first:border-0 first:pt-0">
