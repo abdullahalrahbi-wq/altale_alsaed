@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import RegistrationForm from "./components/RegistrationForm";
 import JudgeDashboard from "./components/JudgeDashboard";
 import AdminDashboard from "./components/AdminDashboard";
+import MemorizationDashboard from "./components/MemorizationDashboard";
 import Logo from "./components/Logo";
 import { Users, Settings, Award, AlertTriangle } from "lucide-react";
 
@@ -61,9 +62,9 @@ export default function App() {
   const [unlockedTabs, setUnlockedTabs] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem("unlocked_tabs");
-      return saved ? JSON.parse(saved) : { home: true };
+      return saved ? JSON.parse(saved) : { home: true, memorization: true };
     } catch {
-      return { home: true };
+      return { home: true, memorization: true };
     }
   });
 
@@ -174,7 +175,7 @@ export default function App() {
       <div className="min-h-screen bg-[#f5f5f0] font-sans text-slate-900 selection:bg-emerald-100" dir="rtl">
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-20 items-center">
+            <div className="flex flex-col md:flex-row justify-between min-h-20 items-center py-4 md:py-0 gap-4">
               <div className="flex items-center gap-4">
                 <div className="bg-white p-1.5 rounded-2xl shadow-md border border-slate-100 overflow-hidden flex items-center justify-center">
                   {settings?.site_logo ? (
@@ -201,34 +202,41 @@ export default function App() {
                 </div>
               </div>
               
-              <div className="hidden md:flex items-center gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200">
+              <div className="flex flex-wrap justify-center items-center gap-1.5 md:gap-2 bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full md:w-auto">
                 <Button 
                   variant={activeTab === "home" ? "default" : "ghost"} 
                   onClick={() => handleTabChange("home")}
-                  className="rounded-xl px-6"
+                  className="rounded-xl px-4 md:px-6 text-xs md:text-sm font-bold"
                 >
                   الرئيسية
                 </Button>
                 <Button 
                   variant={activeTab === "register" ? "default" : "ghost"} 
                   onClick={() => handleTabChange("register")}
-                  className="rounded-xl px-6"
+                  className="rounded-xl px-4 md:px-6 text-xs md:text-sm font-bold"
                 >
                   التسجيل
                 </Button>
                 <Button 
                   variant={activeTab === "judge" ? "default" : "ghost"} 
                   onClick={() => handleTabChange("judge")}
-                  className="rounded-xl px-6"
+                  className="rounded-xl px-4 md:px-6 text-xs md:text-sm font-bold"
                 >
                   التقييم
                 </Button>
                 <Button 
                   variant={activeTab === "admin" ? "default" : "ghost"} 
                   onClick={() => handleTabChange("admin")}
-                  className="rounded-xl px-6"
+                  className="rounded-xl px-4 md:px-6 text-xs md:text-sm font-bold"
                 >
                   الإدارة
+                </Button>
+                <Button 
+                  variant={activeTab === "memorization" ? "default" : "ghost"} 
+                  onClick={() => handleTabChange("memorization")}
+                  className="rounded-xl px-4 md:px-6 text-xs md:text-sm font-bold text-emerald-800 hover:bg-emerald-50"
+                >
+                  نظام التحفيظ والمتابعة
                 </Button>
               </div>
             </div>
@@ -367,6 +375,7 @@ export default function App() {
               )}
               {activeTab === "judge" && <JudgeDashboard />}
               {activeTab === "admin" && <AdminDashboard />}
+              {activeTab === "memorization" && <MemorizationDashboard />}
             </div>
           )}
         </main>

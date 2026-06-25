@@ -154,6 +154,207 @@ if (!adminExists) {
   db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("admin", "admin123", "admin");
 }
 
+// Initialize Memorization System Database Tables
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS memo_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL, -- 'admin', 'teacher', 'supervisor', 'parent'
+      code TEXT UNIQUE NOT NULL,
+      phone TEXT,
+      status TEXT DEFAULT 'active',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_students (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      village TEXT,
+      parent_phone TEXT,
+      parent_code TEXT UNIQUE,
+      parent_id INTEGER,
+      status TEXT DEFAULT 'active',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_programs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      start_date TEXT,
+      end_date TEXT,
+      status TEXT DEFAULT 'active',
+      created_by INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      program_id INTEGER,
+      teacher_id INTEGER,
+      village TEXT,
+      level TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(program_id) REFERENCES memo_programs(id),
+      FOREIGN KEY(teacher_id) REFERENCES memo_users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_group_students (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER,
+      student_id INTEGER,
+      FOREIGN KEY(group_id) REFERENCES memo_groups(id),
+      FOREIGN KEY(student_id) REFERENCES memo_students(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_supervisors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      code TEXT UNIQUE NOT NULL,
+      phone TEXT,
+      status TEXT DEFAULT 'active'
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_teacher_supervisor (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      teacher_id INTEGER,
+      supervisor_id INTEGER,
+      FOREIGN KEY(teacher_id) REFERENCES memo_users(id),
+      FOREIGN KEY(supervisor_id) REFERENCES memo_supervisors(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_quran_sections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      surah_name TEXT NOT NULL,
+      surah_number INTEGER,
+      section_name TEXT,
+      from_ayah INTEGER,
+      to_ayah INTEGER,
+      juz INTEGER,
+      order_number INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_program_sections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      program_id INTEGER,
+      section_id INTEGER,
+      FOREIGN KEY(program_id) REFERENCES memo_programs(id),
+      FOREIGN KEY(section_id) REFERENCES memo_quran_sections(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER,
+      group_id INTEGER,
+      teacher_id INTEGER,
+      program_id INTEGER,
+      section_id INTEGER,
+      status TEXT DEFAULT 'لم يبدأ', -- 'لم يبدأ', 'جاري الحفظ', 'تم الحفظ', 'تم التسميع الأول', 'تم التسميع الثاني / مراجعة وتثبيت'
+      first_recitation_done INTEGER DEFAULT 0,
+      first_recitation_date TEXT,
+      second_recitation_done INTEGER DEFAULT 0,
+      second_recitation_date TEXT,
+      mastery_level TEXT, -- 'ممتاز', 'جيد جداً', 'جيد', 'يحتاج متابعة'
+      teacher_notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(student_id) REFERENCES memo_students(id),
+      FOREIGN KEY(group_id) REFERENCES memo_groups(id),
+      FOREIGN KEY(teacher_id) REFERENCES memo_users(id),
+      FOREIGN KEY(program_id) REFERENCES memo_programs(id),
+      FOREIGN KEY(section_id) REFERENCES memo_quran_sections(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_supervisor_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      supervisor_id INTEGER,
+      teacher_id INTEGER,
+      group_id INTEGER,
+      message TEXT NOT NULL,
+      rating INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      is_read INTEGER DEFAULT 0,
+      FOREIGN KEY(supervisor_id) REFERENCES memo_supervisors(id),
+      FOREIGN KEY(teacher_id) REFERENCES memo_users(id),
+      FOREIGN KEY(group_id) REFERENCES memo_groups(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS memo_parent_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_id INTEGER,
+      student_id INTEGER,
+      last_login DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Seed default admin for Memorization System
+  const memoAdminExists = db.prepare("SELECT * FROM memo_users WHERE role = 'admin'").get();
+  if (!memoAdminExists) {
+    db.prepare("INSERT INTO memo_users (name, role, code, phone, status) VALUES (?, ?, ?, ?, ?)")
+      .run("إدارة التحفيظ والمتابعة", "admin", "admin77", "99998888", "active");
+  }
+
+  // Pre-seed Quran sections with Juz 30 and Fatihah if table is empty
+  const sectionCount = db.prepare("SELECT COUNT(*) as count FROM memo_quran_sections").get() as { count: number };
+  if (sectionCount.count === 0) {
+    const defaultSections = [
+      { num: 1, name: "سورة الفاتحة", juz: 1 },
+      { num: 78, name: "سورة النبأ", juz: 30 },
+      { num: 79, name: "سورة النازعات", juz: 30 },
+      { num: 80, name: "سورة عبس", juz: 30 },
+      { num: 81, name: "سورة التكوير", juz: 30 },
+      { num: 82, name: "سورة الانفطار", juz: 30 },
+      { num: 83, name: "سورة المطففين", juz: 30 },
+      { num: 84, name: "سورة الانشقاق", juz: 30 },
+      { num: 85, name: "سورة البروج", juz: 30 },
+      { num: 86, name: "سورة الطارق", juz: 30 },
+      { num: 87, name: "سورة الأعلى", juz: 30 },
+      { num: 88, name: "سورة الغاشية", juz: 30 },
+      { num: 89, name: "سورة الفجر", juz: 30 },
+      { num: 90, name: "سورة البلد", juz: 30 },
+      { num: 91, name: "سورة الشمس", juz: 30 },
+      { num: 92, name: "سورة الليل", juz: 30 },
+      { num: 93, name: "سورة الضحى", juz: 30 },
+      { num: 94, name: "سورة الشرح", juz: 30 },
+      { num: 95, name: "سورة التين", juz: 30 },
+      { num: 96, name: "سورة العلق", juz: 30 },
+      { num: 97, name: "سورة القدر", juz: 30 },
+      { num: 98, name: "سورة البينة", juz: 30 },
+      { num: 99, name: "سورة الزلزلة", juz: 30 },
+      { num: 100, name: "سورة العاديات", juz: 30 },
+      { num: 101, name: "سورة القارعة", juz: 30 },
+      { num: 102, name: "سورة التكاثر", juz: 30 },
+      { num: 103, name: "سورة العصر", juz: 30 },
+      { num: 104, name: "سورة الهمزة", juz: 30 },
+      { num: 105, name: "سورة الفيل", juz: 30 },
+      { num: 106, name: "سورة قريش", juz: 30 },
+      { num: 107, name: "سورة الماعون", juz: 30 },
+      { num: 108, name: "سورة الكوثر", juz: 30 },
+      { num: 109, name: "سورة الكافرون", juz: 30 },
+      { num: 110, name: "سورة النصر", juz: 30 },
+      { num: 111, name: "سورة المسد", juz: 30 },
+      { num: 112, name: "سورة الإخلاص", juz: 30 },
+      { num: 113, name: "سورة الفلق", juz: 30 },
+      { num: 114, name: "سورة الناس", juz: 30 }
+    ];
+
+    const insertSection = db.prepare(`
+      INSERT INTO memo_quran_sections (surah_name, surah_number, section_name, from_ayah, to_ayah, juz, order_number)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    db.transaction(() => {
+      defaultSections.forEach((s, idx) => {
+        insertSection.run(s.name, s.num, "كامل السورة", 1, null, s.juz, idx + 1);
+      });
+    })();
+  }
+} catch (e) {
+  console.error("Error creating/seeding memo_ tables:", e);
+}
+
 async function startServer() {
   console.log("Starting server...");
   const app = express();
@@ -636,6 +837,682 @@ async function startServer() {
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- Memorization System API ---
+
+  // Auth: Login via single Access Code
+  app.post("/api/memorization/auth/login", (req, res) => {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: "الرجاء إدخال كود الدخول" });
+    }
+
+    try {
+      // 1. Check memo_users (Admin, Teacher)
+      const user = db.prepare("SELECT * FROM memo_users WHERE code = ? AND status = 'active'").get(code) as any;
+      if (user) {
+        return res.json({
+          success: true,
+          role: user.role,
+          user: { id: user.id, name: user.name, role: user.role, code: user.code, phone: user.phone }
+        });
+      }
+
+      // 2. Check memo_supervisors (Supervisor)
+      const supervisor = db.prepare("SELECT * FROM memo_supervisors WHERE code = ? AND status = 'active'").get(code) as any;
+      if (supervisor) {
+        return res.json({
+          success: true,
+          role: "supervisor",
+          user: { id: supervisor.id, name: supervisor.name, role: "supervisor", code: supervisor.code, phone: supervisor.phone }
+        });
+      }
+
+      // 3. Check memo_students for Parent Code
+      const student = db.prepare("SELECT * FROM memo_students WHERE parent_code = ? AND status = 'active'").get(code) as any;
+      if (student) {
+        return res.json({
+          success: true,
+          role: "parent",
+          user: { id: student.id, name: `ولي أمر الطالب: ${student.name}`, role: "parent", code: student.parent_code, phone: student.parent_phone },
+          student: student
+        });
+      }
+
+      return res.status(404).json({ error: "كود الدخول غير صحيح أو غير مفعل" });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Stats
+  app.get("/api/memorization/admin/stats", (req, res) => {
+    try {
+      const studentCount = db.prepare("SELECT COUNT(*) as c FROM memo_students WHERE status = 'active'").get() as any;
+      const teacherCount = db.prepare("SELECT COUNT(*) as c FROM memo_users WHERE role = 'teacher' AND status = 'active'").get() as any;
+      const supervisorCount = db.prepare("SELECT COUNT(*) as c FROM memo_supervisors WHERE status = 'active'").get() as any;
+      const programCount = db.prepare("SELECT COUNT(*) as c FROM memo_programs WHERE status = 'active'").get() as any;
+      const groupCount = db.prepare("SELECT COUNT(*) as c FROM memo_groups").get() as any;
+
+      const recordStats = db.prepare(`
+        SELECT COUNT(*) as total, 
+               SUM(CASE WHEN status IN ('تم الحفظ', 'تم التسميع الأول', 'تم التسميع الثاني / مراجعة وتثبيت') THEN 1 ELSE 0 END) as completed
+        FROM memo_records
+      `).get() as any;
+
+      let avgCompletion = 0;
+      if (recordStats && recordStats.total > 0) {
+        avgCompletion = Math.round((recordStats.completed / recordStats.total) * 100);
+      }
+
+      res.json({
+        students: studentCount?.c || 0,
+        teachers: teacherCount?.c || 0,
+        supervisors: supervisorCount?.c || 0,
+        programs: programCount?.c || 0,
+        groups: groupCount?.c || 0,
+        avgCompletion: avgCompletion
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Programs
+  app.get("/api/memorization/admin/programs", (req, res) => {
+    try {
+      const programs = db.prepare("SELECT * FROM memo_programs ORDER BY id DESC").all();
+      res.json(programs);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/programs", (req, res) => {
+    const { name, description, start_date, end_date, status } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO memo_programs (name, description, start_date, end_date, status)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(name, description, start_date, end_date, status || "active");
+      res.json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/memorization/admin/programs/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, description, start_date, end_date, status } = req.body;
+    try {
+      db.prepare(`
+        UPDATE memo_programs
+        SET name = ?, description = ?, start_date = ?, end_date = ?, status = ?
+        WHERE id = ?
+      `).run(name, description, start_date, end_date, status, id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memorization/admin/programs/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.transaction(() => {
+        db.prepare("DELETE FROM memo_program_sections WHERE program_id = ?").run(id);
+        db.prepare("DELETE FROM memo_programs WHERE id = ?").run(id);
+      })();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Students
+  app.get("/api/memorization/admin/students", (req, res) => {
+    try {
+      const students = db.prepare("SELECT * FROM memo_students ORDER BY id DESC").all();
+      res.json(students);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/students", (req, res) => {
+    const { name, village, parent_phone, parent_code } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO memo_students (name, village, parent_phone, parent_code)
+        VALUES (?, ?, ?, ?)
+      `).run(name, village, parent_phone, parent_code);
+      res.json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/memorization/admin/students/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, village, parent_phone, parent_code, status } = req.body;
+    try {
+      db.prepare(`
+        UPDATE memo_students
+        SET name = ?, village = ?, parent_phone = ?, parent_code = ?, status = ?
+        WHERE id = ?
+      `).run(name, village, parent_phone, parent_code, status, id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memorization/admin/students/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.transaction(() => {
+        db.prepare("DELETE FROM memo_group_students WHERE student_id = ?").run(id);
+        db.prepare("DELETE FROM memo_records WHERE student_id = ?").run(id);
+        db.prepare("DELETE FROM memo_students WHERE id = ?").run(id);
+      })();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Teachers
+  app.get("/api/memorization/admin/teachers", (req, res) => {
+    try {
+      const teachers = db.prepare("SELECT * FROM memo_users WHERE role = 'teacher' ORDER BY id DESC").all();
+      res.json(teachers);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/teachers", (req, res) => {
+    const { name, code, phone } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO memo_users (name, role, code, phone, status)
+        VALUES (?, 'teacher', ?, ?, 'active')
+      `).run(name, code, phone);
+      res.json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/memorization/admin/teachers/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, code, phone, status } = req.body;
+    try {
+      db.prepare(`
+        UPDATE memo_users
+        SET name = ?, code = ?, phone = ?, status = ?
+        WHERE id = ? AND role = 'teacher'
+      `).run(name, code, phone, status, id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memorization/admin/teachers/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("DELETE FROM memo_users WHERE id = ? AND role = 'teacher'").run(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Supervisors
+  app.get("/api/memorization/admin/supervisors", (req, res) => {
+    try {
+      const supervisors = db.prepare("SELECT * FROM memo_supervisors ORDER BY id DESC").all();
+      res.json(supervisors);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/supervisors", (req, res) => {
+    const { name, code, phone } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO memo_supervisors (name, code, phone, status)
+        VALUES (?, ?, ?, 'active')
+      `).run(name, code, phone);
+      res.json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/memorization/admin/supervisors/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, code, phone, status } = req.body;
+    try {
+      db.prepare(`
+        UPDATE memo_supervisors
+        SET name = ?, code = ?, phone = ?, status = ?
+        WHERE id = ?
+      `).run(name, code, phone, status, id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memorization/admin/supervisors/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("DELETE FROM memo_supervisors WHERE id = ?").run(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Sorahs & Sections
+  app.get("/api/memorization/admin/sections", (req, res) => {
+    try {
+      const sections = db.prepare("SELECT * FROM memo_quran_sections ORDER BY surah_number ASC, order_number ASC").all();
+      res.json(sections);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/sections", (req, res) => {
+    const { surah_name, surah_number, section_name, from_ayah, to_ayah, juz, order_number } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO memo_quran_sections (surah_name, surah_number, section_name, from_ayah, to_ayah, juz, order_number)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(surah_name, surah_number, section_name, from_ayah, to_ayah, juz, order_number);
+      res.json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/memorization/admin/sections/:id", (req, res) => {
+    const { id } = req.params;
+    const { surah_name, surah_number, section_name, from_ayah, to_ayah, juz, order_number } = req.body;
+    try {
+      db.prepare(`
+        UPDATE memo_quran_sections
+        SET surah_name = ?, surah_number = ?, section_name = ?, from_ayah = ?, to_ayah = ?, juz = ?, order_number = ?
+        WHERE id = ?
+      `).run(surah_name, surah_number, section_name, from_ayah, to_ayah, juz, order_number, id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memorization/admin/sections/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("DELETE FROM memo_quran_sections WHERE id = ?").run(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Program Sections Mapping
+  app.get("/api/memorization/admin/programs/:id/sections", (req, res) => {
+    const { id } = req.params;
+    try {
+      const sections = db.prepare(`
+        SELECT qs.*, (CASE WHEN ps.id IS NOT NULL THEN 1 ELSE 0 END) as selected
+        FROM memo_quran_sections qs
+        LEFT JOIN memo_program_sections ps ON ps.section_id = qs.id AND ps.program_id = ?
+        ORDER BY qs.surah_number ASC, qs.order_number ASC
+      `).all(id);
+      res.json(sections);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/programs/:id/sections", (req, res) => {
+    const { id } = req.params;
+    const { section_ids } = req.body;
+    try {
+      db.transaction(() => {
+        db.prepare("DELETE FROM memo_program_sections WHERE program_id = ?").run(id);
+        const insert = db.prepare("INSERT INTO memo_program_sections (program_id, section_id) VALUES (?, ?)");
+        if (Array.isArray(section_ids)) {
+          section_ids.forEach(sid => insert.run(id, sid));
+        }
+      })();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin: Groups Setup
+  app.get("/api/memorization/admin/groups", (req, res) => {
+    try {
+      const groups = db.prepare(`
+        SELECT g.*, p.name as program_name, t.name as teacher_name,
+          (SELECT COUNT(*) FROM memo_group_students WHERE group_id = g.id) as student_count
+        FROM memo_groups g
+        JOIN memo_programs p ON g.program_id = p.id
+        JOIN memo_users t ON g.teacher_id = t.id
+        ORDER BY g.id DESC
+      `).all();
+      res.json(groups);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/groups", (req, res) => {
+    const { name, program_id, teacher_id, village, level } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO memo_groups (name, program_id, teacher_id, village, level)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(name, program_id, teacher_id, village, level);
+      res.json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memorization/admin/groups/:id", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.transaction(() => {
+        db.prepare("DELETE FROM memo_group_students WHERE group_id = ?").run(id);
+        db.prepare("DELETE FROM memo_records WHERE group_id = ?").run(id);
+        db.prepare("DELETE FROM memo_groups WHERE id = ?").run(id);
+      })();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin/Teacher: Group Students
+  app.get("/api/memorization/admin/groups/:id/students", (req, res) => {
+    const { id } = req.params;
+    try {
+      const students = db.prepare(`
+        SELECT s.*, gs.id as mapping_id
+        FROM memo_students s
+        JOIN memo_group_students gs ON gs.student_id = s.id
+        WHERE gs.group_id = ?
+      `).all(id);
+      res.json(students);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/admin/groups/:id/students", (req, res) => {
+    const { id } = req.params;
+    const { student_ids } = req.body;
+    try {
+      db.transaction(() => {
+        const insert = db.prepare("INSERT OR IGNORE INTO memo_group_students (group_id, student_id) VALUES (?, ?)");
+        if (Array.isArray(student_ids)) {
+          student_ids.forEach(sid => insert.run(id, sid));
+        }
+      })();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/memorization/admin/groups/:id/students/:student_id", (req, res) => {
+    const { id, student_id } = req.params;
+    try {
+      db.prepare("DELETE FROM memo_group_students WHERE group_id = ? AND student_id = ?").run(id, student_id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Teacher specific endpoints
+  app.get("/api/memorization/teacher/:teacher_id/groups", (req, res) => {
+    const { teacher_id } = req.params;
+    try {
+      const groups = db.prepare(`
+        SELECT g.*, p.name as program_name,
+          (SELECT COUNT(*) FROM memo_group_students WHERE group_id = g.id) as student_count
+        FROM memo_groups g
+        JOIN memo_programs p ON g.program_id = p.id
+        WHERE g.teacher_id = ?
+        ORDER BY g.id DESC
+      `).all(teacher_id);
+      res.json(groups);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/memorization/teacher/available-students", (req, res) => {
+    try {
+      const students = db.prepare("SELECT * FROM memo_students WHERE status = 'active' ORDER BY name ASC").all();
+      res.json(students);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get student memorization records & program sections
+  app.get("/api/memorization/teacher/students/:student_id/records", (req, res) => {
+    const { student_id } = req.params;
+    const { program_id } = req.query;
+    try {
+      const records = db.prepare(`
+        SELECT qs.*, 
+          r.id as record_id,
+          r.status as record_status,
+          r.first_recitation_done,
+          r.first_recitation_date,
+          r.second_recitation_done,
+          r.second_recitation_date,
+          r.mastery_level,
+          r.teacher_notes
+        FROM memo_program_sections ps
+        JOIN memo_quran_sections qs ON ps.section_id = qs.id
+        LEFT JOIN memo_records r ON r.section_id = qs.id AND r.student_id = ? AND r.program_id = ?
+        WHERE ps.program_id = ?
+        ORDER BY qs.surah_number ASC, qs.order_number ASC
+      `).all(student_id, program_id, program_id);
+      res.json(records);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Post or Update evaluation record
+  app.post("/api/memorization/teacher/records", (req, res) => {
+    const { 
+      student_id, group_id, teacher_id, program_id, section_id, 
+      status, first_recitation_done, first_recitation_date, 
+      second_recitation_done, second_recitation_date, mastery_level, teacher_notes 
+    } = req.body;
+
+    try {
+      const existing = db.prepare(`
+        SELECT id FROM memo_records 
+        WHERE student_id = ? AND program_id = ? AND section_id = ?
+      `).get(student_id, program_id, section_id) as any;
+
+      if (existing) {
+        db.prepare(`
+          UPDATE memo_records
+          SET status = ?, 
+              first_recitation_done = ?, first_recitation_date = ?,
+              second_recitation_done = ?, second_recitation_date = ?,
+              mastery_level = ?, teacher_notes = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(
+          status, 
+          first_recitation_done ? 1 : 0, first_recitation_date,
+          second_recitation_done ? 1 : 0, second_recitation_date,
+          mastery_level, teacher_notes, existing.id
+        );
+        res.json({ id: existing.id, updated: true });
+      } else {
+        const result = db.prepare(`
+          INSERT INTO memo_records (
+            student_id, group_id, teacher_id, program_id, section_id,
+            status, first_recitation_done, first_recitation_date,
+            second_recitation_done, second_recitation_date, mastery_level, teacher_notes
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          student_id, group_id, teacher_id, program_id, section_id,
+          status, first_recitation_done ? 1 : 0, first_recitation_date,
+          second_recitation_done ? 1 : 0, second_recitation_date,
+          mastery_level, teacher_notes
+        );
+        res.json({ id: result.lastInsertRowid, created: true });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Supervisor APIs
+  app.get("/api/memorization/supervisor/teachers", (req, res) => {
+    try {
+      const teachers = db.prepare(`
+        SELECT u.id, u.name, u.phone, u.status,
+          (SELECT COUNT(*) FROM memo_groups WHERE teacher_id = u.id) as group_count,
+          (SELECT COUNT(DISTINCT gs.student_id) 
+           FROM memo_groups g 
+           JOIN memo_group_students gs ON gs.group_id = g.id 
+           WHERE g.teacher_id = u.id) as student_count
+        FROM memo_users u
+        WHERE u.role = 'teacher'
+        ORDER BY u.name ASC
+      `).all();
+      res.json(teachers);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/memorization/supervisor/groups", (req, res) => {
+    try {
+      const groups = db.prepare(`
+        SELECT g.*, p.name as program_name, t.name as teacher_name,
+          (SELECT COUNT(*) FROM memo_group_students WHERE group_id = g.id) as student_count
+        FROM memo_groups g
+        JOIN memo_programs p ON g.program_id = p.id
+        JOIN memo_users t ON g.teacher_id = t.id
+        ORDER BY g.id DESC
+      `).all();
+      res.json(groups);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/supervisor/notes", (req, res) => {
+    const { supervisor_id, teacher_id, group_id, message, rating } = req.body;
+    try {
+      const result = db.prepare(`
+        INSERT INTO memo_supervisor_notes (supervisor_id, teacher_id, group_id, message, rating, is_read)
+        VALUES (?, ?, ?, ?, ?, 0)
+      `).run(supervisor_id, teacher_id, group_id, message, rating);
+      res.json({ id: result.lastInsertRowid });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/memorization/teacher/:teacher_id/messages", (req, res) => {
+    const { teacher_id } = req.params;
+    try {
+      const messages = db.prepare(`
+        SELECT sn.*, s.name as supervisor_name, g.name as group_name
+        FROM memo_supervisor_notes sn
+        JOIN memo_supervisors s ON sn.supervisor_id = s.id
+        LEFT JOIN memo_groups g ON sn.group_id = g.id
+        WHERE sn.teacher_id = ?
+        ORDER BY sn.id DESC
+      `).all(teacher_id);
+      res.json(messages);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/memorization/teacher/messages/:id/read", (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare("UPDATE memo_supervisor_notes SET is_read = 1 WHERE id = ?").run(id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Parent API: Student Progress details
+  app.get("/api/memorization/parent/student/:student_id", (req, res) => {
+    const { student_id } = req.params;
+    try {
+      const student = db.prepare("SELECT * FROM memo_students WHERE id = ?").get(student_id) as any;
+      if (!student) {
+        return res.status(404).json({ error: "الطالب غير موجود" });
+      }
+
+      db.prepare("INSERT INTO memo_parent_views (student_id, last_login) VALUES (?, CURRENT_TIMESTAMP)").run(student_id);
+
+      const groupInfo = db.prepare(`
+        SELECT g.*, p.name as program_name, t.name as teacher_name, t.phone as teacher_phone
+        FROM memo_group_students gs
+        JOIN memo_groups g ON gs.group_id = g.id
+        JOIN memo_programs p ON g.program_id = p.id
+        JOIN memo_users t ON g.teacher_id = t.id
+        WHERE gs.student_id = ?
+        LIMIT 1
+      `).get(student_id) as any;
+
+      let records = [];
+      if (groupInfo) {
+        records = db.prepare(`
+          SELECT qs.*, 
+            r.status as record_status,
+            r.first_recitation_done,
+            r.first_recitation_date,
+            r.second_recitation_done,
+            r.second_recitation_date,
+            r.mastery_level,
+            r.teacher_notes,
+            r.updated_at
+          FROM memo_program_sections ps
+          JOIN memo_quran_sections qs ON ps.section_id = qs.id
+          LEFT JOIN memo_records r ON r.section_id = qs.id AND r.student_id = ? AND r.program_id = ?
+          WHERE ps.program_id = ?
+          ORDER BY qs.surah_number ASC, qs.order_number ASC
+        `).all(student_id, groupInfo.program_id, groupInfo.program_id);
+      }
+
+      res.json({
+        student,
+        group: groupInfo || null,
+        records: records
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
