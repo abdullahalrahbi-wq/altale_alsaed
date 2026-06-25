@@ -94,6 +94,25 @@ export default function MemorizationDashboard() {
   // Parent view stats
   const [parentData, setParentData] = useState<any>(null);
 
+  // Supervisor student performance states
+  const [supervisorProgramId, setSupervisorProgramId] = useState<string>("");
+  const [supervisorStudentData, setSupervisorStudentData] = useState<any[]>([]);
+  const [supervisorLoading, setSupervisorLoading] = useState<boolean>(false);
+  const [expandedStudentId, setExpandedStudentId] = useState<number | null>(null);
+
+  const fetchSupervisorStudentPerformance = (programId: string) => {
+    if (!programId) {
+      setSupervisorStudentData([]);
+      return;
+    }
+    setSupervisorLoading(true);
+    fetch(`/api/memorization/supervisor/program/${programId}/performance`)
+      .then(res => res.json())
+      .then(data => setSupervisorStudentData(data))
+      .catch(() => toast.error("فشل تحميل أداء الطلاب"))
+      .finally(() => setSupervisorLoading(false));
+  };
+
   // Save user session
   useEffect(() => {
     if (currentUser) {
@@ -156,9 +175,12 @@ export default function MemorizationDashboard() {
     } else if (currentUser.role === "teacher") {
       fetchTeacherGroups();
       fetchTeacherMessages();
+      fetchStudents();
+      fetchPrograms();
     } else if (currentUser.role === "supervisor") {
       fetchSupervisorTeachers();
       fetchSupervisorGroups();
+      fetchPrograms();
     } else if (currentUser.role === "parent" && parentStudent) {
       fetchParentStudentDetails(parentStudent.id);
     }
@@ -443,6 +465,7 @@ export default function MemorizationDashboard() {
         fetchAdminStats();
         if (currentUser?.role === "teacher") {
           fetchTeacherGroups();
+          setActiveSubTab("my_groups");
         }
       }
     } catch {
@@ -530,6 +553,9 @@ export default function MemorizationDashboard() {
         // reload
         openGroupStudents(selectedGroup);
         fetchGroups();
+        if (currentUser?.role === "teacher") {
+          fetchTeacherGroups();
+        }
       }
     } catch {
       toast.error("فشل إضافة الطالب");
@@ -545,6 +571,9 @@ export default function MemorizationDashboard() {
         toast.success("تم إزالة الطالب من المجموعة");
         openGroupStudents(selectedGroup);
         fetchGroups();
+        if (currentUser?.role === "teacher") {
+          fetchTeacherGroups();
+        }
       }
     } catch {
       toast.error("فشل إزالة الطالب");
@@ -1601,10 +1630,20 @@ export default function MemorizationDashboard() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {teacherGroups.map((g) => (
                         <div key={g.id} className="bg-slate-50/50 rounded-2xl p-5 border border-slate-200 hover:border-emerald-300 transition-all space-y-4">
-                          <div className="space-y-1">
-                            <h4 className="font-bold text-slate-900 text-base">{g.name}</h4>
-                            <p className="text-xs text-slate-500">البرنامج: {g.program_name}</p>
-                            <p className="text-xs text-slate-400">المستوى: {g.level || "غير محدد"}</p>
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="space-y-1">
+                              <h4 className="font-bold text-slate-900 text-base">{g.name}</h4>
+                              <p className="text-xs text-slate-500">البرنامج: {g.program_name}</p>
+                              <p className="text-xs text-slate-400">المستوى: {g.level || "غير محدد"}</p>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => openGroupStudents(g)}
+                              className="h-8 text-xs border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl"
+                            >
+                              <UserCheck className="w-3.5 h-3.5 ml-1" /> إضافة طلبة
+                            </Button>
                           </div>
 
                           <div className="border-t border-slate-200/60 pt-4 space-y-3">
@@ -1897,7 +1936,7 @@ export default function MemorizationDashboard() {
             <div className="space-y-8">
               {/* Supervisor Tabs */}
               <div className="flex flex-wrap gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
-                {["overview", "monitor_teachers", "evaluate_teacher"].map((tab) => (
+                {["overview", "monitor_teachers", "student_performance", "evaluate_teacher"].map((tab) => (
                   <Button
                     key={tab}
                     variant={activeSubTab === tab ? "default" : "ghost"}
@@ -1906,6 +1945,7 @@ export default function MemorizationDashboard() {
                   >
                     {tab === "overview" && "لوحة الإشراف العام"}
                     {tab === "monitor_teachers" && "متابعة أداء المحفظين"}
+                    {tab === "student_performance" && "متابعة أداء الطلاب"}
                     {tab === "evaluate_teacher" && "تقييم وإرسال ملاحظة"}
                   </Button>
                 ))}
@@ -2048,6 +2088,159 @@ export default function MemorizationDashboard() {
                   </div>
                 )}
 
+                {/* 4. STUDENT PERFORMANCE TAB */}
+                {activeSubTab === "student_performance" && (
+                  <div className="space-y-6">
+                    <div className="border-b border-slate-100 pb-4">
+                      <h3 className="text-lg font-bold">متابعة وتقييم أداء طلاب الحلقات</h3>
+                      <p className="text-xs text-slate-500">اختر البرنامج التعليمي لمشاهدة جميع الطلاب المدرجين ومتابعة تفاصيل تقدمهم وأدائهم بدقة.</p>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                      <label className="text-xs font-bold text-slate-600 shrink-0">اختر البرنامج المستهدف:</label>
+                      <select 
+                        value={supervisorProgramId} 
+                        onChange={(e) => {
+                          setSupervisorProgramId(e.target.value);
+                          fetchSupervisorStudentPerformance(e.target.value);
+                        }}
+                        className="w-full md:w-80 border border-slate-200 rounded-xl p-2.5 text-xs bg-white font-bold"
+                      >
+                        <option value="">-- اختر البرنامج --</option>
+                        {programs.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {supervisorLoading ? (
+                      <div className="p-12 text-center text-slate-500 space-y-3">
+                        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mx-auto" />
+                        <p className="text-xs font-bold">جاري تحميل سجلات الطلاب وأدائهم...</p>
+                      </div>
+                    ) : !supervisorProgramId ? (
+                      <div className="p-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200 space-y-3">
+                        <BookOpen className="w-10 h-10 text-slate-400 mx-auto" />
+                        <h4 className="font-bold text-slate-700 text-sm">لم يتم اختيار أي برنامج بعد</h4>
+                        <p className="text-xs text-slate-500">يرجى تحديد برنامج من القائمة المنسدلة أعلاه لاستعراض الطلبة والتقييمات الخاصة بهم.</p>
+                      </div>
+                    ) : supervisorStudentData.length === 0 ? (
+                      <div className="p-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200 space-y-3">
+                        <AlertCircle className="w-10 h-10 text-slate-400 mx-auto" />
+                        <h4 className="font-bold text-slate-700 text-sm">لا يوجد طلاب مسجلين</h4>
+                        <p className="text-xs text-slate-500">لا يوجد طلاب مدرجين في هذا البرنامج تحت أي حلقة حالياً.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="text-xs font-bold text-slate-500">إجمالي الطلبة المدرجين: {supervisorStudentData.length} طالباً</div>
+                        <div className="grid grid-cols-1 gap-4">
+                          {supervisorStudentData.map((student) => {
+                            const isExpanded = expandedStudentId === student.id;
+                            const progressPercent = student.total_sections > 0 
+                              ? Math.round((student.completed_sections / student.total_sections) * 100) 
+                              : 0;
+
+                            return (
+                              <div key={student.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:border-slate-300 transition-colors">
+                                <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/40">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="font-bold text-slate-900 text-base">{student.name}</h4>
+                                      <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                        {student.village || "قرية الطالع"}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500">
+                                      الحلقة: <strong className="text-slate-800">{student.group_name}</strong> • المحفّظ: <strong className="text-slate-800">{student.teacher_name}</strong>
+                                    </p>
+                                  </div>
+
+                                  <div className="w-full md:w-64 space-y-1.5">
+                                    <div className="flex justify-between text-xs font-bold text-slate-600">
+                                      <span>نسبة الإنجاز بالحفظ</span>
+                                      <span>{student.completed_sections} / {student.total_sections} مقاطع ({progressPercent}%)</span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                                      <div className="bg-emerald-600 h-full rounded-full" style={{ width: `${progressPercent}%` }} />
+                                    </div>
+                                  </div>
+
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setExpandedStudentId(isExpanded ? null : student.id)}
+                                    className="h-9 text-xs rounded-xl border-slate-300 text-slate-700 font-bold hover:bg-slate-100"
+                                  >
+                                    {isExpanded ? "إخفاء التقييم التفصيلي" : "عرض التقييم التفصيلي"}
+                                  </Button>
+                                </div>
+
+                                {isExpanded && (
+                                  <div className="p-5 border-t border-slate-200 bg-white space-y-3">
+                                    <h5 className="text-xs font-bold text-slate-500">سجل التقييم التفصيلي وحالة المقاطع القرآنية:</h5>
+                                    {student.records && student.records.length > 0 ? (
+                                      <div className="overflow-x-auto border border-slate-100 rounded-xl">
+                                        <table className="w-full text-right text-xs border-collapse">
+                                          <thead>
+                                            <tr className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                                              <th className="p-2.5 font-bold">المقطع / السورة</th>
+                                              <th className="p-2.5 font-bold">الحالة الإنجازية</th>
+                                              <th className="p-2.5 font-bold">تقييم التسميع الأول</th>
+                                              <th className="p-2.5 font-bold">تقييم التسميع الثاني (المراجعة)</th>
+                                              <th className="p-2.5 font-bold">مستوى الإتقان</th>
+                                              <th className="p-2.5 font-bold">توجيهات المحفظ</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100">
+                                            {student.records.map((rec: any, idx: number) => (
+                                              <tr key={idx} className="hover:bg-slate-50/30">
+                                                <td className="p-2.5 font-bold text-slate-800">
+                                                  {rec.surah_name} <span className="text-[10px] text-slate-400 font-normal">({rec.section_name})</span>
+                                                </td>
+                                                <td className="p-2.5">
+                                                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+                                                    rec.record_status === "تم التسميع الثاني / مراجعة وتثبيت" ? "bg-green-100 text-green-800" :
+                                                    rec.record_status === "تم التسميع الأول" ? "bg-emerald-100 text-emerald-800" :
+                                                    rec.record_status === "تم الحفظ" ? "bg-teal-100 text-teal-800" :
+                                                    rec.record_status === "جاري الحفظ" ? "bg-amber-100 text-amber-800" :
+                                                    "bg-slate-100 text-slate-500"
+                                                  }`}>
+                                                    {rec.record_status || "لم يبدأ"}
+                                                  </span>
+                                                </td>
+                                                <td className="p-2.5 text-slate-600">
+                                                  {rec.first_recitation_done ? `✅ تم (${rec.first_recitation_date || "-"})` : "❌ لم يتم بعد"}
+                                                </td>
+                                                <td className="p-2.5 text-slate-600">
+                                                  {rec.second_recitation_done ? `✅ تم (${rec.second_recitation_date || "-"})` : "❌ لم يتم بعد"}
+                                                </td>
+                                                <td className="p-2.5 font-bold">
+                                                  {rec.mastery_level ? (
+                                                    <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded">{rec.mastery_level}</span>
+                                                  ) : "-"}
+                                                </td>
+                                                <td className="p-2.5 text-slate-500 max-w-xs truncate" title={rec.teacher_notes}>
+                                                  {rec.teacher_notes || "-"}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-slate-400 text-center p-4">لا توجد تفاصيل تسميع مسجلة حالياً في البرنامج.</p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             </div>
           )}
@@ -2136,15 +2329,27 @@ export default function MemorizationDashboard() {
                               <div className="text-xs text-slate-500">{rec.section_name} • جزء {rec.juz}</div>
                             </td>
                             <td className="p-3">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                                rec.record_status === "تم التسميع الثاني / مراجعة وتثبيت" ? "bg-green-100 text-green-800" :
-                                rec.record_status === "تم التسميع الأول" ? "bg-emerald-100 text-emerald-800" :
-                                rec.record_status === "تم الحفظ" ? "bg-teal-100 text-teal-800" :
-                                rec.record_status === "جاري الحفظ" ? "bg-amber-100 text-amber-800" :
-                                "bg-slate-100 text-slate-500"
-                              }`}>
-                                {rec.record_status || "لم يبدأ"}
-                              </span>
+                              <div className="space-y-1.5">
+                                <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold ${
+                                  rec.record_status === "تم التسميع الثاني / مراجعة وتثبيت" ? "bg-green-100 text-green-800" :
+                                  rec.record_status === "تم التسميع الأول" ? "bg-emerald-100 text-emerald-800" :
+                                  rec.record_status === "تم الحفظ" ? "bg-teal-100 text-teal-800" :
+                                  rec.record_status === "جاري الحفظ" ? "bg-amber-100 text-amber-800" :
+                                  "bg-slate-100 text-slate-500"
+                                }`}>
+                                  {rec.record_status || "لم يبدأ"}
+                                </span>
+                                <div className="space-y-1 text-[11px] text-slate-500 bg-slate-50/55 p-2 rounded-xl border border-slate-100">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`w-2.5 h-2.5 rounded-full border ${rec.first_recitation_done ? "bg-emerald-500 border-emerald-600" : "bg-slate-200 border-slate-300"}`} />
+                                    <span>التسميع الأول: {rec.first_recitation_done ? `تم (${rec.first_recitation_date || "معتمد"})` : "لم يتم بعد"}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`w-2.5 h-2.5 rounded-full border ${rec.second_recitation_done ? "bg-green-500 border-green-600" : "bg-slate-200 border-slate-300"}`} />
+                                    <span>المراجعة والتثبيت: {rec.second_recitation_done ? `تم (${rec.second_recitation_date || "معتمد"})` : "لم يتم بعد"}</span>
+                                  </div>
+                                </div>
+                              </div>
                             </td>
                             <td className="p-3 font-bold text-xs text-slate-700">
                               {rec.mastery_level ? (

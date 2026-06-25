@@ -1432,6 +1432,65 @@ async function startServer() {
     }
   });
 
+  app.get("/api/memorization/supervisor/program/:program_id/performance", (req, res) => {
+    const { program_id } = req.params;
+    try {
+      const students = db.prepare(`
+        SELECT s.id, s.name, s.village, s.parent_phone,
+               g.id as group_id, g.name as group_name,
+               t.name as teacher_name
+        FROM memo_group_students gs
+        JOIN memo_students s ON gs.student_id = s.id
+        JOIN memo_groups g ON gs.group_id = g.id
+        JOIN memo_users t ON g.teacher_id = t.id
+        WHERE g.program_id = ?
+        ORDER BY s.name ASC
+      `).all(program_id) as any[];
+
+      const totalSections = db.prepare(`
+        SELECT COUNT(*) as count 
+        FROM memo_program_sections 
+        WHERE program_id = ?
+      `).get(program_id) as any;
+
+      const totalCount = totalSections?.count || 0;
+
+      const result = students.map((student) => {
+        const records = db.prepare(`
+          SELECT qs.surah_name, qs.section_name, qs.juz, qs.surah_number,
+                 r.status as record_status,
+                 r.first_recitation_done,
+                 r.first_recitation_date,
+                 r.second_recitation_done,
+                 r.second_recitation_date,
+                 r.mastery_level,
+                 r.teacher_notes,
+                 r.updated_at
+          FROM memo_program_sections ps
+          JOIN memo_quran_sections qs ON ps.section_id = qs.id
+          LEFT JOIN memo_records r ON r.section_id = qs.id AND r.student_id = ? AND r.program_id = ?
+          WHERE ps.program_id = ?
+          ORDER BY qs.surah_number ASC, qs.order_number ASC
+        `).all(student.id, program_id, program_id) as any[];
+
+        const completedCount = records.filter(r => 
+          ["تم التسميع الثاني / مراجعة وتثبيت", "تم التسميع الأول", "تم الحفظ"].includes(r.record_status)
+        ).length;
+
+        return {
+          ...student,
+          total_sections: totalCount,
+          completed_sections: completedCount,
+          records
+        };
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post("/api/memorization/supervisor/notes", (req, res) => {
     const { supervisor_id, teacher_id, group_id, message, rating } = req.body;
     try {
