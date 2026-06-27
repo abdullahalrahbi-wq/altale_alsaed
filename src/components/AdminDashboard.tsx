@@ -60,65 +60,65 @@ export default function AdminDashboard() {
     };
   };
 
-  const renderSvgDonut = (segments: { name: string; value: number; color: string }[]) => {
+  const renderProgressBar = (segments: { name: string; value: number; color: string }[]) => {
     const total = segments.reduce((sum, s) => sum + s.value, 0);
     if (total === 0) {
       return `
-        <svg width="120" height="120" viewBox="0 0 42 42" style="font-family: sans-serif;">
-          <circle cx="21" cy="21" r="15.91549430918954" fill="#fff"></circle>
-          <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#f1f5f9" stroke-width="4"></circle>
-          <text x="21" y="23" font-size="3" text-anchor="middle" fill="#94a3b8">لا توجد بيانات</text>
-        </svg>
+        <div style="width: 100%; height: 12px; background-color: #f1f5f9; border-radius: 9999px;"></div>
       `;
     }
 
-    let currentOffset = 25; // start at top (90 degrees)
-    let svgContent = `
-      <svg width="120" height="120" viewBox="0 0 42 42" style="font-family: sans-serif;">
-        <circle cx="21" cy="21" r="15.91549430918954" fill="#fff"></circle>
-        <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#f1f5f9" stroke-width="4"></circle>
-    `;
-
+    let progressHtml = `<div style="width: 100%; height: 16px; background-color: #f1f5f9; border-radius: 9999px; overflow: hidden; display: flex; flex-direction: row-reverse; gap: 1px;">`;
     segments.forEach(seg => {
-      const percent = (seg.value / total) * 100;
-      if (percent > 0) {
-        svgContent += `
-          <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="${seg.color}" stroke-width="4"
-            stroke-dasharray="${percent} ${100 - percent}"
-            stroke-dashoffset="${currentOffset}"
-          ></circle>
-        `;
-        currentOffset -= percent;
+      const pct = (seg.value / total) * 100;
+      if (pct > 0) {
+        progressHtml += `<div style="background-color: ${seg.color}; width: ${pct}%; height: 100%;" title="${seg.name}"></div>`;
       }
     });
-
-    // Add total inside the donut
-    svgContent += `
-        <text x="21" y="19.5" font-size="4" font-weight="bold" text-anchor="middle" fill="#1e293b">${total}</text>
-        <text x="21" y="23.5" font-size="2" font-weight="bold" text-anchor="middle" fill="#64748b">إجمالي</text>
-      </svg>
-    `;
-
-    return svgContent;
+    progressHtml += `</div>`;
+    return progressHtml;
   };
 
   const handleExportPDF = async () => {
     setPdfExporting(true);
     try {
+      // Safe CORS logo fetch
+      let safeLogoUrl = "";
+      if (competition?.logo_url) {
+        try {
+          const response = await fetch(competition.logo_url);
+          if (response.ok) {
+            const blob = await response.blob();
+            safeLogoUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch (e) {
+          console.warn("Logo URL could not be fetched with CORS. Fallback to text logo.", e);
+        }
+      }
+
+      const logoHtml = safeLogoUrl
+        ? `<img src="${safeLogoUrl}" style="max-height: 64px; max-width: 64px; object-fit: contain; border-radius: 12px;" />`
+        : `<div style="width: 64px; height: 64px; border-radius: 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; color: #047857; font-family: sans-serif;">مصلح</div>`;
+
       const printContainer = document.createElement("div");
       printContainer.id = "pdf-print-container";
-      printContainer.style.position = "absolute";
-      printContainer.style.left = "-9999px";
-      printContainer.style.top = "-9999px";
+      // Position fixed but tucked behind other layers using z-index and keep opacity to ensure browser layout & rendering.
+      printContainer.style.position = "fixed";
+      printContainer.style.left = "0";
+      printContainer.style.top = "0";
       printContainer.style.width = "800px";
+      printContainer.style.zIndex = "-9999";
+      printContainer.style.opacity = "1";
+      printContainer.style.pointerEvents = "none";
       printContainer.style.backgroundColor = "white";
       printContainer.style.color = "#1e293b";
       printContainer.style.direction = "rtl";
       printContainer.style.padding = "30px";
-
-      const logoHtml = competition?.logo_url 
-        ? `<img src="${competition.logo_url}" style="max-height: 64px; max-width: 64px; object-fit: contain; border-radius: 12px;" />`
-        : `<div style="width: 64px; height: 64px; border-radius: 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #047857;">مصلح</div>`;
 
       const totalStudents = results.length;
       const evaluatedCount = results.filter(r => r.judge_count >= 2).length;
@@ -156,8 +156,8 @@ export default function AdminDashboard() {
         { name: "غير مجاز", value: genNotPassed, color: "#ef4444" }
       ];
 
-      const generalProgressHtml = renderSvgDonut(evalProgressData);
-      const generalSuccessHtml = renderSvgDonut(genSuccessData);
+      const generalProgressHtml = renderProgressBar(evalProgressData);
+      const generalSuccessHtml = renderProgressBar(genSuccessData);
 
       const levelColors = ["#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#06b6d4", "#14b8a6", "#64748b"];
       const levelDistData = (competition?.levels || []).map((level: any) => {
@@ -168,7 +168,7 @@ export default function AdminDashboard() {
         };
       }).filter((d: any) => d.value > 0);
 
-      const levelDistributionHtml = renderSvgDonut(levelDistData.map((d: any, index: number) => ({
+      const levelDistributionHtml = renderProgressBar(levelDistData.map((d: any, index: number) => ({
         name: d.name,
         value: d.value,
         color: levelColors[index % levelColors.length]
@@ -184,7 +184,7 @@ export default function AdminDashboard() {
           { name: "غير مجاز", value: stats.notPassed, color: "#dc2626" }
         ];
         
-        const levelDonutHtml = renderSvgDonut(levelSuccessData);
+        const levelBarHtml = renderProgressBar(levelSuccessData);
         
         const fullyPassedPercent = stats.evaluated > 0 ? ((stats.fullyPassed / stats.evaluated) * 100).toFixed(1) : "0";
         const partiallyPassedPercent = stats.evaluated > 0 ? ((stats.partiallyPassed / stats.evaluated) * 100).toFixed(1) : "0";
@@ -216,8 +216,8 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px;">
-              <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+              <div style="display: flex; flex-direction: column; gap: 12px;">
                 <div>
                   <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; margin-bottom: 4px;">
                     <span style="color: #065f46; display: flex; align-items: center; gap: 6px;">
@@ -258,8 +258,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background-color: white; padding: 10px; border-radius: 16px; border: 1px solid #f1f5f9;">
-                ${levelDonutHtml}
+              <div style="background-color: white; padding: 12px; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px;">
+                <span style="font-size: 11px; color: #64748b; font-weight: bold;">توزيع نسب النجاح والاجتياز الإجمالي للمستوى:</span>
+                ${levelBarHtml}
               </div>
             </div>
           </div>
@@ -298,19 +299,13 @@ export default function AdminDashboard() {
               <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 📊 حالة تقييم المتقدمين (المستوى العام)
               </h3>
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: bold;">
-                  <div style="color: #64748b; margin-bottom: 4px;">إجمالي المتسابقين: <span style="color: #1e293b; font-size: 13px; font-weight: 900;">${totalStudents}</span></div>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #10b981;"></span>
-                    <span>تم التقييم بالكامل: ${evaluatedCount} (${totalStudents > 0 ? ((evaluatedCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #f59e0b;"></span>
-                    <span>قيد التقييم: ${underEvaluationCount} (${totalStudents > 0 ? ((underEvaluationCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
-                  </div>
+              <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: bold;">
+                <div style="color: #64748b; margin-bottom: 4px;">إجمالي المتسابقين: <span style="color: #1e293b; font-size: 13px; font-weight: 900;">${totalStudents}</span></div>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <span style="color: #10b981;">تم التقييم بالكامل: ${evaluatedCount} (${totalStudents > 0 ? ((evaluatedCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
+                  <span style="color: #f59e0b;">قيد التقييم: ${underEvaluationCount} (${totalStudents > 0 ? ((underEvaluationCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
                 </div>
-                <div style="background-color: #f8fafc; padding: 5px; border-radius: 12px; border: 1px solid #f1f5f9;">
+                <div style="margin-top: 5px;">
                   ${generalProgressHtml}
                 </div>
               </div>
@@ -321,23 +316,14 @@ export default function AdminDashboard() {
               <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 🏆 نسب النجاح العام (للطلاب المقيَّمين)
               </h3>
-              <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: bold;">
-                  <div style="color: #64748b; margin-bottom: 4px;">تم تقييمهم: <span style="color: #1e293b; font-size: 13px; font-weight: 900;">${evaluatedCount}</span></div>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #047857;"></span>
-                    <span>مجاز بالكامل: ${genFullyPassed} (${evaluatedCount > 0 ? ((genFullyPassed / evaluatedCount) * 100).toFixed(1) : 0}%)</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #3b82f6;"></span>
-                    <span>المنزل لمستوى أقل: ${genPartiallyPassed} (${evaluatedCount > 0 ? ((genPartiallyPassed / evaluatedCount) * 100).toFixed(1) : 0}%)</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #ef4444;"></span>
-                    <span>غير مجاز: ${genNotPassed} (${evaluatedCount > 0 ? ((genNotPassed / evaluatedCount) * 100).toFixed(1) : 0}%)</span>
-                  </div>
+              <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: bold;">
+                <div style="color: #64748b; margin-bottom: 4px;">تم تقييمهم: <span style="color: #1e293b; font-size: 13px; font-weight: 900;">${evaluatedCount}</span></div>
+                <div style="display: flex; justify-content: space-between; gap: 4px;">
+                  <span style="color: #047857;">مجاز بالكامل: ${genFullyPassed}</span>
+                  <span style="color: #3b82f6;">المنزل لمستوى أقل: ${genPartiallyPassed}</span>
+                  <span style="color: #ef4444;">غير مجاز: ${genNotPassed}</span>
                 </div>
-                <div style="background-color: #f8fafc; padding: 5px; border-radius: 12px; border: 1px solid #f1f5f9;">
+                <div style="margin-top: 5px;">
                   ${generalSuccessHtml}
                 </div>
               </div>
@@ -349,8 +335,8 @@ export default function AdminDashboard() {
             <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
               👥 توزيع ومشاركة الطلاب على مستويات المسابقة
             </h3>
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px;">
-              <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; font-weight: bold;">
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 11px; font-weight: bold;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 ${levelDistData.map((d: any, i: number) => `
                   <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
@@ -361,7 +347,7 @@ export default function AdminDashboard() {
                   </div>
                 `).join("")}
               </div>
-              <div style="background-color: #f8fafc; padding: 5px; border-radius: 12px; border: 1px solid #f1f5f9;">
+              <div style="margin-top: 5px;">
                 ${levelDistributionHtml}
               </div>
             </div>
@@ -394,8 +380,9 @@ export default function AdminDashboard() {
       const canvas = await html2canvas(printContainer, {
         scale: 2, // high quality
         useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff"
+        logging: true,
+        backgroundColor: "#ffffff",
+        width: 800
       });
 
       const imgData = canvas.toDataURL("image/jpeg", 0.98);
