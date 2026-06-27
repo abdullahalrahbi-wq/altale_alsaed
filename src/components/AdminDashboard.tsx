@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { BarChart3, Plus, Trash2, Download, Settings, Users, FileText, Loader2, Trophy, CheckCircle, Edit2, Save, X, UploadCloud, RefreshCw, PieChart as PieIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RechartsPieChart, Pie, Legend } from "recharts";
 import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 export default function AdminDashboard() {
   const [results, setResults] = useState<any[]>([]);
@@ -19,6 +21,414 @@ export default function AdminDashboard() {
   const [globalSettings, setGlobalSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [selectedAnalysisLevelId, setSelectedAnalysisLevelId] = useState<string>("");
+  const [pdfExporting, setPdfExporting] = useState(false);
+
+  const getLevelStats = (levelId: string | number) => {
+    const levelContestants = results.filter(r => r.level_id?.toString() === levelId.toString());
+    const levelTotal = levelContestants.length;
+    const levelEvaluated = levelContestants.filter(r => r.judge_count >= 2);
+    const levelEvaluatedCount = levelEvaluated.length;
+    const levelUnderEvaluation = levelContestants.filter(r => r.judge_count < 2).length;
+
+    let levelFullyPassed = 0;
+    let levelPartiallyPassed = 0;
+    let levelNotPassed = 0;
+
+    levelEvaluated.forEach(r => {
+      const finalScore = r.average_score || 0;
+      const passedJuz = r.juz_details?.filter((j: any) => j.average >= 75) || [];
+      const passedJuzCount = passedJuz.length;
+      const totalJuzCount = r.juz_count || 0;
+
+      if (passedJuzCount === totalJuzCount && finalScore >= 75) {
+        levelFullyPassed++;
+      } else if (passedJuzCount > 0) {
+        levelPartiallyPassed++;
+      } else {
+        levelNotPassed++;
+      }
+    });
+
+    return {
+      total: levelTotal,
+      evaluated: levelEvaluatedCount,
+      underEvaluation: levelUnderEvaluation,
+      fullyPassed: levelFullyPassed,
+      partiallyPassed: levelPartiallyPassed,
+      notPassed: levelNotPassed,
+      hasData: levelFullyPassed > 0 || levelPartiallyPassed > 0 || levelNotPassed > 0
+    };
+  };
+
+  const renderSvgDonut = (segments: { name: string; value: number; color: string }[]) => {
+    const total = segments.reduce((sum, s) => sum + s.value, 0);
+    if (total === 0) {
+      return `
+        <svg width="120" height="120" viewBox="0 0 42 42" style="font-family: sans-serif;">
+          <circle cx="21" cy="21" r="15.91549430918954" fill="#fff"></circle>
+          <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#f1f5f9" stroke-width="4"></circle>
+          <text x="21" y="23" font-size="3" text-anchor="middle" fill="#94a3b8">لا توجد بيانات</text>
+        </svg>
+      `;
+    }
+
+    let currentOffset = 25; // start at top (90 degrees)
+    let svgContent = `
+      <svg width="120" height="120" viewBox="0 0 42 42" style="font-family: sans-serif;">
+        <circle cx="21" cy="21" r="15.91549430918954" fill="#fff"></circle>
+        <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="#f1f5f9" stroke-width="4"></circle>
+    `;
+
+    segments.forEach(seg => {
+      const percent = (seg.value / total) * 100;
+      if (percent > 0) {
+        svgContent += `
+          <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke="${seg.color}" stroke-width="4"
+            stroke-dasharray="${percent} ${100 - percent}"
+            stroke-dashoffset="${currentOffset}"
+          ></circle>
+        `;
+        currentOffset -= percent;
+      }
+    });
+
+    // Add total inside the donut
+    svgContent += `
+        <text x="21" y="19.5" font-size="4" font-weight="bold" text-anchor="middle" fill="#1e293b">${total}</text>
+        <text x="21" y="23.5" font-size="2" font-weight="bold" text-anchor="middle" fill="#64748b">إجمالي</text>
+      </svg>
+    `;
+
+    return svgContent;
+  };
+
+  const handleExportPDF = async () => {
+    setPdfExporting(true);
+    try {
+      const printContainer = document.createElement("div");
+      printContainer.id = "pdf-print-container";
+      printContainer.style.position = "absolute";
+      printContainer.style.left = "-9999px";
+      printContainer.style.top = "-9999px";
+      printContainer.style.width = "800px";
+      printContainer.style.backgroundColor = "white";
+      printContainer.style.color = "#1e293b";
+      printContainer.style.direction = "rtl";
+      printContainer.style.padding = "30px";
+
+      const logoHtml = competition?.logo_url 
+        ? `<img src="${competition.logo_url}" style="max-height: 64px; max-width: 64px; object-fit: contain; border-radius: 12px;" />`
+        : `<div style="width: 64px; height: 64px; border-radius: 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #047857;">مصلح</div>`;
+
+      const totalStudents = results.length;
+      const evaluatedCount = results.filter(r => r.judge_count >= 2).length;
+      const underEvaluationCount = results.filter(r => r.judge_count < 2).length;
+
+      const evalProgressData = [
+        { name: "تم التقييم بالكامل", value: evaluatedCount, color: "#10b981" },
+        { name: "قيد التقييم", value: underEvaluationCount, color: "#f59e0b" }
+      ];
+
+      let genFullyPassed = 0;
+      let genPartiallyPassed = 0;
+      let genNotPassed = 0;
+
+      results.forEach(r => {
+        if (r.judge_count >= 2) {
+          const finalScore = r.average_score || 0;
+          const passedJuz = r.juz_details?.filter((j: any) => j.average >= 75) || [];
+          const passedJuzCount = passedJuz.length;
+          const totalJuzCount = r.juz_count || 0;
+
+          if (passedJuzCount === totalJuzCount && finalScore >= 75) {
+            genFullyPassed++;
+          } else if (passedJuzCount > 0) {
+            genPartiallyPassed++;
+          } else {
+            genNotPassed++;
+          }
+        }
+      });
+
+      const genSuccessData = [
+        { name: "مجاز بالكامل", value: genFullyPassed, color: "#047857" },
+        { name: "المنزل إلى مستوى أقل", value: genPartiallyPassed, color: "#3b82f6" },
+        { name: "غير مجاز", value: genNotPassed, color: "#ef4444" }
+      ];
+
+      const generalProgressHtml = renderSvgDonut(evalProgressData);
+      const generalSuccessHtml = renderSvgDonut(genSuccessData);
+
+      const levelColors = ["#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#06b6d4", "#14b8a6", "#64748b"];
+      const levelDistData = (competition?.levels || []).map((level: any) => {
+        const count = results.filter(r => r.level_id === level.id).length;
+        return {
+          name: level.name,
+          value: count
+        };
+      }).filter((d: any) => d.value > 0);
+
+      const levelDistributionHtml = renderSvgDonut(levelDistData.map((d: any, index: number) => ({
+        name: d.name,
+        value: d.value,
+        color: levelColors[index % levelColors.length]
+      })));
+
+      let levelsBreakdownHtml = "";
+      (competition?.levels || []).forEach((level: any) => {
+        const stats = getLevelStats(level.id);
+        
+        const levelSuccessData = [
+          { name: "مجاز بالكامل", value: stats.fullyPassed, color: "#059669" },
+          { name: "المنزل إلى مستوى أقل", value: stats.partiallyPassed, color: "#2563eb" },
+          { name: "غير مجاز", value: stats.notPassed, color: "#dc2626" }
+        ];
+        
+        const levelDonutHtml = renderSvgDonut(levelSuccessData);
+        
+        const fullyPassedPercent = stats.evaluated > 0 ? ((stats.fullyPassed / stats.evaluated) * 100).toFixed(1) : "0";
+        const partiallyPassedPercent = stats.evaluated > 0 ? ((stats.partiallyPassed / stats.evaluated) * 100).toFixed(1) : "0";
+        const notPassedPercent = stats.evaluated > 0 ? ((stats.notPassed / stats.evaluated) * 100).toFixed(1) : "0";
+
+        levelsBreakdownHtml += `
+          <div style="margin-top: 25px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #f8fafc; page-break-inside: avoid;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #cbd5e1; padding-bottom: 8px; margin-bottom: 15px;">
+              <span style="font-size: 15px; font-weight: 900; color: #1e293b;">🔹 ${level.name}</span>
+              <span style="font-size: 11px; color: #64748b; font-weight: bold;">${level.description || ""}</span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; text-align: center;">
+              <div style="background-color: white; padding: 10px; border-radius: 12px; border: 1px solid #f1f5f9;">
+                <p style="font-size: 10px; color: #94a3b8; font-weight: bold; margin: 0;">إجمالي المسجلين</p>
+                <p style="font-size: 14px; font-weight: 900; color: #1e293b; margin: 4px 0 0 0;">${stats.total}</p>
+              </div>
+              <div style="background-color: #f0fdf4; padding: 10px; border-radius: 12px; border: 1px solid #dcfce7;">
+                <p style="font-size: 10px; color: #16a34a; font-weight: bold; margin: 0;">تم تقييمهم</p>
+                <p style="font-size: 14px; font-weight: 900; color: #14532d; margin: 4px 0 0 0;">${stats.evaluated}</p>
+              </div>
+              <div style="background-color: #eff6ff; padding: 10px; border-radius: 12px; border: 1px solid #dbeafe;">
+                <p style="font-size: 10px; color: #2563eb; font-weight: bold; margin: 0;">قيد التقييم</p>
+                <p style="font-size: 14px; font-weight: 900; color: #1e3a8a; margin: 4px 0 0 0;">${stats.underEvaluation}</p>
+              </div>
+              <div style="background-color: #fffbeb; padding: 10px; border-radius: 12px; border: 1px solid #fef3c7;">
+                <p style="font-size: 10px; color: #d97706; font-weight: bold; margin: 0;">معدل الاجتياز</p>
+                <p style="font-size: 14px; font-weight: 900; color: #78350f; margin: 4px 0 0 0;">${stats.evaluated > 0 ? (((stats.fullyPassed + stats.partiallyPassed) / stats.evaluated) * 100).toFixed(0) : 0}%</p>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; margin-bottom: 4px;">
+                    <span style="color: #065f46; display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #059669; display: inline-block;"></span>
+                      مجاز بالكامل: ${stats.fullyPassed} متسابق
+                    </span>
+                    <span style="color: #1e293b;">${fullyPassedPercent}%</span>
+                  </div>
+                  <div style="width: 100%; height: 8px; border-radius: 9999px; overflow: hidden; background-color: #cbd5e1;">
+                    <div style="background-color: #059669; height: 100%; border-radius: 9999px; width: ${fullyPassedPercent}%"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; margin-bottom: 4px;">
+                    <span style="color: #1e40af; display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #2563eb; display: inline-block;"></span>
+                      المنزل إلى مستوى أقل: ${stats.partiallyPassed} متسابق
+                    </span>
+                    <span style="color: #1e293b;">${partiallyPassedPercent}%</span>
+                  </div>
+                  <div style="width: 100%; height: 8px; border-radius: 9999px; overflow: hidden; background-color: #cbd5e1;">
+                    <div style="background-color: #2563eb; height: 100%; border-radius: 9999px; width: ${partiallyPassedPercent}%"></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: bold; margin-bottom: 4px;">
+                    <span style="color: #991b1b; display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #dc2626; display: inline-block;"></span>
+                      غير مجاز: ${stats.notPassed} متسابق
+                    </span>
+                    <span style="color: #1e293b;">${notPassedPercent}%</span>
+                  </div>
+                  <div style="width: 100%; height: 8px; border-radius: 9999px; overflow: hidden; background-color: #cbd5e1;">
+                    <div style="background-color: #dc2626; height: 100%; border-radius: 9999px; width: ${notPassedPercent}%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; background-color: white; padding: 10px; border-radius: 16px; border: 1px solid #f1f5f9;">
+                ${levelDonutHtml}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      const currentDate = new Date().toLocaleDateString("ar-EG", { year: 'numeric', month: 'long', day: 'numeric' });
+
+      printContainer.innerHTML = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: rtl; text-align: right; background-color: white;">
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #059669; padding-bottom: 15px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+              ${logoHtml}
+              <div>
+                <h1 style="font-size: 18px; font-weight: 900; color: #1e293b; margin: 0;">${competition?.name || "مسابقة حفظ القرآن الكريم"}</h1>
+                <p style="font-size: 11px; color: #64748b; font-weight: bold; margin: 4px 0 0 0;">عام المسابقة: ${competition?.year || new Date().getFullYear()}</p>
+              </div>
+            </div>
+            <div style="text-align: left;">
+              <p style="font-size: 14px; font-weight: 900; color: #059669; margin: 0;">تقرير التحليل الإحصائي العام</p>
+              <p style="font-size: 10px; color: #94a3b8; font-weight: bold; margin: 4px 0 0 0;">تاريخ التصدير: ${currentDate}</p>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <h2 style="font-size: 16px; font-weight: 900; color: #1e293b; background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px 20px; border-radius: 12px; display: inline-block; margin: 0;">
+              📊 نتائج ونسب الإنجاز والنجاح التفصيلية لكافة مستويات المسابقة
+            </h2>
+          </div>
+
+          <!-- Section 1: General Overviews -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; page-break-inside: avoid;">
+            <!-- Card 1 -->
+            <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; background-color: white;">
+              <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+                📊 حالة تقييم المتقدمين (المستوى العام)
+              </h3>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: bold;">
+                  <div style="color: #64748b; margin-bottom: 4px;">إجمالي المتسابقين: <span style="color: #1e293b; font-size: 13px; font-weight: 900;">${totalStudents}</span></div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #10b981;"></span>
+                    <span>تم التقييم بالكامل: ${evaluatedCount} (${totalStudents > 0 ? ((evaluatedCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #f59e0b;"></span>
+                    <span>قيد التقييم: ${underEvaluationCount} (${totalStudents > 0 ? ((underEvaluationCount / totalStudents) * 100).toFixed(1) : 0}%)</span>
+                  </div>
+                </div>
+                <div style="background-color: #f8fafc; padding: 5px; border-radius: 12px; border: 1px solid #f1f5f9;">
+                  ${generalProgressHtml}
+                </div>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; background-color: white;">
+              <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+                🏆 نسب النجاح العام (للطلاب المقيَّمين)
+              </h3>
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; font-weight: bold;">
+                  <div style="color: #64748b; margin-bottom: 4px;">تم تقييمهم: <span style="color: #1e293b; font-size: 13px; font-weight: 900;">${evaluatedCount}</span></div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #047857;"></span>
+                    <span>مجاز بالكامل: ${genFullyPassed} (${evaluatedCount > 0 ? ((genFullyPassed / evaluatedCount) * 100).toFixed(1) : 0}%)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #3b82f6;"></span>
+                    <span>المنزل لمستوى أقل: ${genPartiallyPassed} (${evaluatedCount > 0 ? ((genPartiallyPassed / evaluatedCount) * 100).toFixed(1) : 0}%)</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background-color: #ef4444;"></span>
+                    <span>غير مجاز: ${genNotPassed} (${evaluatedCount > 0 ? ((genNotPassed / evaluatedCount) * 100).toFixed(1) : 0}%)</span>
+                  </div>
+                </div>
+                <div style="background-color: #f8fafc; padding: 5px; border-radius: 12px; border: 1px solid #f1f5f9;">
+                  ${generalSuccessHtml}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Level Distribution -->
+          <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; background-color: white; margin-top: 20px; page-break-inside: avoid;">
+            <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+              👥 توزيع ومشاركة الطلاب على مستويات المسابقة
+            </h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px;">
+              <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; font-weight: bold;">
+                ${levelDistData.map((d: any, i: number) => `
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${levelColors[i % levelColors.length]}; display: inline-block;"></span>
+                      <span style="color: #475569;">${d.name}</span>
+                    </div>
+                    <span style="color: #1e293b; font-weight: 900;">${d.value} طالباً (${totalStudents > 0 ? ((d.value / totalStudents) * 100).toFixed(1) : 0}%)</span>
+                  </div>
+                `).join("")}
+              </div>
+              <div style="background-color: #f8fafc; padding: 5px; border-radius: 12px; border: 1px solid #f1f5f9;">
+                ${levelDistributionHtml}
+              </div>
+            </div>
+          </div>
+
+          <div style="page-break-before: always; height: 1px;"></div>
+
+          <!-- Section 3: Level-by-level detailed analysis -->
+          <div style="margin-top: 25px;">
+            <h3 style="font-size: 14px; font-weight: 900; color: #1e293b; margin: 0 0 15px 0; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px;">
+              📋 التفاصيل ونسب النجاح والاجتياز التفصيلية لكل مستوى على حدة
+            </h3>
+            ${levelsBreakdownHtml}
+          </div>
+
+          <!-- Footer -->
+          <div style="margin-top: 40px; border-top: 1px solid #cbd5e1; padding-top: 15px; text-align: center; font-size: 10px; color: #94a3b8; font-weight: bold; display: flex; justify-content: space-between; align-items: center; page-break-inside: avoid;">
+            <p>المشرف العام على المسابقة</p>
+            <p>تم استخراج هذا التقرير الإحصائي تلقائياً من نظام التقييم والتحكيم</p>
+            <p>© ${new Date().getFullYear()} مسابقة مصلح</p>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(printContainer);
+
+      // Wait a little bit for the DOM to completely lay out and load images
+      await new Promise(r => setTimeout(r, 800));
+
+      const canvas = await html2canvas(printContainer, {
+        scale: 2, // high quality
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff"
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+      const pdf = new jsPDF("p", "mm", "a4");
+      const imgWidth = 210; // A4 width in mm
+      const pageHeight = 295; // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const cleanCompName = competition?.name ? competition.name.replace(/\s+/g, '_') : "المسابقة";
+      pdf.save(`تقرير_التحليل_الإحصائي_${cleanCompName}.pdf`);
+      toast.success("تم استخراج التقرير الإحصائي بصيغة PDF بنجاح!");
+
+      document.body.removeChild(printContainer);
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+      toast.error("حدث خطأ أثناء تصدير ملف الـ PDF. يرجى المحاولة مرة أخرى.");
+    } finally {
+      setPdfExporting(false);
+    }
+  };
+
   const [editingCompId, setEditingCompId] = useState<number | null>(null);
   const [editingContestantId, setEditingContestantId] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
@@ -635,7 +1045,7 @@ export default function AdminDashboard() {
 
   const generalSuccessData = [
     { name: "مجاز بالكامل", value: generalFullyPassed, color: "#047857" }, // deep emerald
-    { name: "مجاز جزئياً", value: generalPartiallyPassed, color: "#3b82f6" }, // blue
+    { name: "المنزل إلى مستوى أقل", value: generalPartiallyPassed, color: "#3b82f6" }, // blue
     { name: "غير مجاز", value: generalNotPassed, color: "#ef4444" } // red
   ];
 
@@ -686,7 +1096,7 @@ export default function AdminDashboard() {
 
   const levelSuccessData = [
     { name: "مجاز بالكامل", value: levelFullyPassed, color: "#059669" },
-    { name: "مجاز جزئياً", value: levelPartiallyPassed, color: "#2563eb" },
+    { name: "المنزل إلى مستوى أقل", value: levelPartiallyPassed, color: "#2563eb" },
     { name: "غير مجاز", value: levelNotPassed, color: "#dc2626" }
   ];
 
@@ -852,10 +1262,29 @@ export default function AdminDashboard() {
 
           {/* Section: General and Level analysis charts */}
           <div className="space-y-6">
-            <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mt-4">
-              <PieIcon className="w-5 h-5 text-emerald-600" />
-              التحليل الإحصائي ونسب الإنجاز والنجاح
-            </h3>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-2 mt-4">
+              <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <PieIcon className="w-5 h-5 text-emerald-600" />
+                التحليل الإحصائي ونسب الإنجاز والنجاح
+              </h3>
+              <Button
+                onClick={handleExportPDF}
+                disabled={pdfExporting}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2 rounded-xl flex items-center gap-2 transition-all duration-200"
+              >
+                {pdfExporting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جاري جلب وتصدير التقرير...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    تصدير التقرير والمخططات بصيغة PDF
+                  </>
+                )}
+              </Button>
+            </div>
 
             {/* General level charts: side-by-side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
