@@ -197,20 +197,20 @@ export default function AdminDashboard() {
               <span style="font-size: 11px; color: #64748b; font-weight: bold;">${level.description || ""}</span>
             </div>
             
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px; text-align: center;">
-              <div style="background-color: white; padding: 10px; border-radius: 12px; border: 1px solid #f1f5f9;">
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; text-align: center;">
+              <div style="flex: 1; background-color: white; padding: 10px; border-radius: 12px; border: 1px solid #f1f5f9;">
                 <p style="font-size: 10px; color: #94a3b8; font-weight: bold; margin: 0;">إجمالي المسجلين</p>
                 <p style="font-size: 14px; font-weight: 900; color: #1e293b; margin: 4px 0 0 0;">${stats.total}</p>
               </div>
-              <div style="background-color: #f0fdf4; padding: 10px; border-radius: 12px; border: 1px solid #dcfce7;">
+              <div style="flex: 1; background-color: #f0fdf4; padding: 10px; border-radius: 12px; border: 1px solid #dcfce7;">
                 <p style="font-size: 10px; color: #16a34a; font-weight: bold; margin: 0;">تم تقييمهم</p>
                 <p style="font-size: 14px; font-weight: 900; color: #14532d; margin: 4px 0 0 0;">${stats.evaluated}</p>
               </div>
-              <div style="background-color: #eff6ff; padding: 10px; border-radius: 12px; border: 1px solid #dbeafe;">
+              <div style="flex: 1; background-color: #eff6ff; padding: 10px; border-radius: 12px; border: 1px solid #dbeafe;">
                 <p style="font-size: 10px; color: #2563eb; font-weight: bold; margin: 0;">قيد التقييم</p>
                 <p style="font-size: 14px; font-weight: 900; color: #1e3a8a; margin: 4px 0 0 0;">${stats.underEvaluation}</p>
               </div>
-              <div style="background-color: #fffbeb; padding: 10px; border-radius: 12px; border: 1px solid #fef3c7;">
+              <div style="flex: 1; background-color: #fffbeb; padding: 10px; border-radius: 12px; border: 1px solid #fef3c7;">
                 <p style="font-size: 10px; color: #d97706; font-weight: bold; margin: 0;">معدل الاجتياز</p>
                 <p style="font-size: 14px; font-weight: 900; color: #78350f; margin: 4px 0 0 0;">${stats.evaluated > 0 ? (((stats.fullyPassed + stats.partiallyPassed) / stats.evaluated) * 100).toFixed(0) : 0}%</p>
               </div>
@@ -293,9 +293,9 @@ export default function AdminDashboard() {
           </div>
 
           <!-- Section 1: General Overviews -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; page-break-inside: avoid;">
+          <div style="display: flex; gap: 20px; margin-top: 20px; page-break-inside: avoid;">
             <!-- Card 1 -->
-            <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; background-color: white;">
+            <div style="flex: 1; border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; background-color: white;">
               <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 📊 حالة تقييم المتقدمين (المستوى العام)
               </h3>
@@ -312,7 +312,7 @@ export default function AdminDashboard() {
             </div>
 
             <!-- Card 2 -->
-            <div style="border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; background-color: white;">
+            <div style="flex: 1; border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; background-color: white;">
               <h3 style="font-size: 12px; font-weight: 900; color: #1e293b; margin: 0 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                 🏆 نسب النجاح العام (للطلاب المقيَّمين)
               </h3>
@@ -336,9 +336,9 @@ export default function AdminDashboard() {
               👥 توزيع ومشاركة الطلاب على مستويات المسابقة
             </h3>
             <div style="display: flex; flex-direction: column; gap: 10px; font-size: 11px; font-weight: bold;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="display: flex; flex-wrap: wrap; gap: 10px;">
                 ${levelDistData.map((d: any, i: number) => `
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+                  <div style="width: calc(50% - 5px); box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
                       <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${levelColors[i % levelColors.length]}; display: inline-block;"></span>
                       <span style="color: #475569;">${d.name}</span>
@@ -382,7 +382,8 @@ export default function AdminDashboard() {
         useCORS: true,
         logging: true,
         backgroundColor: "#ffffff",
-        width: 800
+        width: 800,
+        windowWidth: 800
       });
 
       const imgData = canvas.toDataURL("image/jpeg", 0.98);
@@ -408,9 +409,9 @@ export default function AdminDashboard() {
       toast.success("تم استخراج التقرير الإحصائي بصيغة PDF بنجاح!");
 
       document.body.removeChild(printContainer);
-    } catch (error) {
+    } catch (error: any) {
       console.error("PDF generation failed:", error);
-      toast.error("حدث خطأ أثناء تصدير ملف الـ PDF. يرجى المحاولة مرة أخرى.");
+      toast.error(`حدث خطأ أثناء تصدير ملف الـ PDF: ${error?.message || error?.toString() || "يرجى المحاولة مرة أخرى"}`);
     } finally {
       setPdfExporting(false);
     }
