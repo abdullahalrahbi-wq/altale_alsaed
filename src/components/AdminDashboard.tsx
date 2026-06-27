@@ -377,14 +377,105 @@ export default function AdminDashboard() {
       // Wait a little bit for the DOM to completely lay out and load images
       await new Promise(r => setTimeout(r, 800));
 
-      const canvas = await html2canvas(printContainer, {
-        scale: 2, // high quality
-        useCORS: true,
-        logging: true,
-        backgroundColor: "#ffffff",
-        width: 800,
-        windowWidth: 800
-      });
+      // Helper to convert oklch to rgba to support html2canvas with Tailwind v4
+      const oklchToRgb = (L: number, C: number, H: number) => {
+        const hRad = (H * Math.PI) / 180;
+        const a = C * Math.cos(hRad);
+        const b = C * Math.sin(hRad);
+        
+        const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+        const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+        const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+        
+        const l = l_ * l_ * l_;
+        const m = m_ * m_ * m_;
+        const s = s_ * s_ * s_;
+        
+        const r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+        const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+        const b_ = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+        
+        const clamp = (val: number) => Math.max(0, Math.min(1, val));
+        const gamma = (val: number) => {
+          val = clamp(val);
+          return val > 0.0031308 ? 1.055 * Math.pow(val, 1 / 2.4) - 0.055 : 12.92 * val;
+        };
+        
+        return {
+          r: Math.round(gamma(r) * 255),
+          g: Math.round(gamma(g) * 255),
+          b: Math.round(gamma(b_) * 255)
+        };
+      };
+
+      const parseAndConvertOklch = (oklchStr: string): string => {
+        if (!oklchStr || typeof oklchStr !== 'string' || !oklchStr.includes('oklch')) {
+          return oklchStr;
+        }
+        
+        return oklchStr.replace(/oklch\s*\(\s*([0-9.]+%?)\s+([0-9.]+%?)\s+([0-9.]+(?:deg|rad|turn)?)(?:\s*\/\s*([0-9.]+%?))?\s*\)/gi, (match, p1, p2, p3, p4) => {
+          try {
+            let l = parseFloat(p1);
+            if (p1.includes('%')) l /= 100;
+            
+            let c = parseFloat(p2);
+            if (p2.includes('%')) c /= 100;
+            
+            let h = parseFloat(p3);
+            if (p3.includes('deg')) h = parseFloat(p3);
+            else if (p3.includes('rad')) h = parseFloat(p3) * (180 / Math.PI);
+            else if (p3.includes('turn')) h = parseFloat(p3) * 360;
+            
+            let alpha = p4 ? parseFloat(p4) : 1;
+            if (p4 && p4.includes('%')) alpha /= 100;
+            
+            const rgb = oklchToRgb(l, c, h);
+            return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+          } catch (e) {
+            return 'rgba(0, 0, 0, 0)';
+          }
+        });
+      };
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = function (el, pseudoElt) {
+        const style = originalGetComputedStyle(el, pseudoElt);
+        return new Proxy(style, {
+          get(target, prop) {
+            if (prop === 'getPropertyValue') {
+              return function (propertyName: string) {
+                const val = target.getPropertyValue(propertyName);
+                if (val && typeof val === 'string' && val.includes('oklch')) {
+                  return parseAndConvertOklch(val);
+                }
+                return val;
+              };
+            }
+            const val = Reflect.get(target, prop);
+            if (typeof val === 'string' && val.includes('oklch')) {
+              return parseAndConvertOklch(val);
+            }
+            if (typeof val === 'function') {
+              return val.bind(target);
+            }
+            return val;
+          }
+        });
+      } as any;
+
+      let canvas;
+      try {
+        canvas = await html2canvas(printContainer, {
+          scale: 2, // high quality
+          useCORS: true,
+          logging: true,
+          backgroundColor: "#ffffff",
+          width: 800,
+          windowWidth: 800
+        });
+      } finally {
+        window.getComputedStyle = originalGetComputedStyle;
+      }
 
       const imgData = canvas.toDataURL("image/jpeg", 0.98);
       const pdf = new jsPDF("p", "mm", "a4");
