@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { BarChart3, Plus, Trash2, Download, Settings, Users, FileText, Loader2, Trophy, CheckCircle, Edit2, Save, X, UploadCloud, RefreshCw } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart3, Plus, Trash2, Download, Settings, Users, FileText, Loader2, Trophy, CheckCircle, Edit2, Save, X, UploadCloud, RefreshCw, PieChart as PieIcon } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RechartsPieChart, Pie, Legend } from "recharts";
 import * as XLSX from "xlsx";
 
 export default function AdminDashboard() {
@@ -18,6 +18,7 @@ export default function AdminDashboard() {
   const [allCompetitions, setAllCompetitions] = useState<any[]>([]);
   const [globalSettings, setGlobalSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
+  const [selectedAnalysisLevelId, setSelectedAnalysisLevelId] = useState<string>("");
   const [editingCompId, setEditingCompId] = useState<number | null>(null);
   const [editingContestantId, setEditingContestantId] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
@@ -600,6 +601,113 @@ export default function AdminDashboard() {
       score: r.average_score
     }));
 
+  // 1. المستوى العام - حالة المتقدمين والتقييم
+  const totalApplicants = results.length;
+  const evaluatedCount = results.filter(r => r.judge_count >= 2).length;
+  const underEvaluationCount = results.filter(r => r.judge_count < 2).length;
+
+  const evaluationProgressData = [
+    { name: "تم التقييم بالكامل", value: evaluatedCount, color: "#10b981" },
+    { name: "قيد التقييم", value: underEvaluationCount, color: "#f59e0b" }
+  ];
+
+  // 2. نسبة النجاح العامة للطلاب المقيَّمين
+  let generalFullyPassed = 0;
+  let generalPartiallyPassed = 0;
+  let generalNotPassed = 0;
+
+  results.forEach(r => {
+    if (r.judge_count >= 2) {
+      const finalScore = r.average_score || 0;
+      const passedJuz = r.juz_details?.filter((j: any) => j.average >= 75) || [];
+      const passedJuzCount = passedJuz.length;
+      const totalJuzCount = r.juz_count || 0;
+
+      if (passedJuzCount === totalJuzCount && finalScore >= 75) {
+        generalFullyPassed++;
+      } else if (passedJuzCount > 0) {
+        generalPartiallyPassed++;
+      } else {
+        generalNotPassed++;
+      }
+    }
+  });
+
+  const generalSuccessData = [
+    { name: "مجاز بالكامل", value: generalFullyPassed, color: "#047857" }, // deep emerald
+    { name: "مجاز جزئياً", value: generalPartiallyPassed, color: "#3b82f6" }, // blue
+    { name: "غير مجاز", value: generalNotPassed, color: "#ef4444" } // red
+  ];
+
+  const generalSuccessHasData = generalFullyPassed > 0 || generalPartiallyPassed > 0 || generalNotPassed > 0;
+
+  // 3. توزيع المشاركين حسب المستويات
+  const levelDistributionData = (competition?.levels || []).map((level: any) => {
+    const count = results.filter(r => r.level_id === level.id).length;
+    return {
+      name: level.name,
+      value: count
+    };
+  }).filter((d: any) => d.value > 0);
+
+  const levelDistributionHasData = levelDistributionData.length > 0 && levelDistributionData.some((d: any) => d.value > 0);
+
+  const levelColors = ["#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b", "#06b6d4", "#14b8a6", "#64748b"];
+
+  // 4. مخطط نسبة النجاح لكل مستوى
+  const activeLevelId = selectedAnalysisLevelId || (competition?.levels?.[0]?.id?.toString() || "");
+  const activeLevel = competition?.levels?.find((l: any) => l.id.toString() === activeLevelId);
+
+  // Calculate stats for this level
+  const levelContestants = results.filter(r => r.level_id?.toString() === activeLevelId);
+  const levelTotal = levelContestants.length;
+  const levelEvaluated = levelContestants.filter(r => r.judge_count >= 2);
+  const levelEvaluatedCount = levelEvaluated.length;
+  const levelUnderEvaluation = levelContestants.filter(r => r.judge_count < 2).length;
+
+  let levelFullyPassed = 0;
+  let levelPartiallyPassed = 0;
+  let levelNotPassed = 0;
+
+  levelEvaluated.forEach(r => {
+    const finalScore = r.average_score || 0;
+    const passedJuz = r.juz_details?.filter((j: any) => j.average >= 75) || [];
+    const passedJuzCount = passedJuz.length;
+    const totalJuzCount = r.juz_count || 0;
+
+    if (passedJuzCount === totalJuzCount && finalScore >= 75) {
+      levelFullyPassed++;
+    } else if (passedJuzCount > 0) {
+      levelPartiallyPassed++;
+    } else {
+      levelNotPassed++;
+    }
+  });
+
+  const levelSuccessData = [
+    { name: "مجاز بالكامل", value: levelFullyPassed, color: "#059669" },
+    { name: "مجاز جزئياً", value: levelPartiallyPassed, color: "#2563eb" },
+    { name: "غير مجاز", value: levelNotPassed, color: "#dc2626" }
+  ];
+
+  const levelSuccessHasData = levelFullyPassed > 0 || levelPartiallyPassed > 0 || levelNotPassed > 0;
+
+  const CustomPieTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-800 text-xs shadow-xl font-bold dir-rtl">
+          <p className="font-bold">{data.name}</p>
+          <p className="text-emerald-400 mt-1">العدد: {data.value} متسابق</p>
+          {payload[0].percent !== undefined && (
+            <p className="text-blue-400">النسبة: {(payload[0].percent * 100).toFixed(1)}%</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-10 py-4">
       <Tabs defaultValue="results" className="w-full flex flex-col items-center">
@@ -740,6 +848,310 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Section: General and Level analysis charts */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 mt-4">
+              <PieIcon className="w-5 h-5 text-emerald-600" />
+              التحليل الإحصائي ونسب الإنجاز والنجاح
+            </h3>
+
+            {/* General level charts: side-by-side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Chart 1: Evaluation Completion Rate */}
+              <Card className="bg-white border-slate-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    المستوى العام: نسبة المتقدمين وحالة التقييم
+                  </CardTitle>
+                  <CardDescription>
+                    توزيع المتسابقين المسجلين حسب اكتمال جلسات التقييم الخاصة بهم
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="h-[280px] relative flex flex-col justify-between">
+                  {isMounted && totalApplicants > 0 ? (
+                    <div className="flex flex-col md:flex-row items-center justify-center h-full">
+                      <div className="w-full md:w-1/2 h-[200px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={evaluationProgressData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={4}
+                              dataKey="value"
+                            >
+                              {evaluationProgressData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip content={<CustomPieTooltip />} />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="w-full md:w-1/2 space-y-3 font-bold text-xs pr-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                          <span className="text-slate-500">إجمالي المتقدمين:</span>
+                          <span className="text-lg font-black text-slate-800">{totalApplicants}</span>
+                        </div>
+                        {evaluationProgressData.map((d, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></span>
+                              <span className="text-slate-600">{d.name}:</span>
+                            </div>
+                            <span className="text-slate-800 font-black">
+                              {d.value} ({totalApplicants > 0 ? ((d.value / totalApplicants) * 100).toFixed(1) : 0}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">
+                      لا توجد بيانات كافية للعرض
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Chart 2: General Success Rate */}
+              <Card className="bg-white border-slate-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-emerald-600" />
+                    المستوى العام: نسبة النجاح والاجتياز
+                  </CardTitle>
+                  <CardDescription>
+                    حالة الاجتياز والإجازة للطلاب الذين تم تقييمهم بالكامل
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="h-[280px] relative flex flex-col justify-between">
+                  {isMounted && generalSuccessHasData ? (
+                    <div className="flex flex-col md:flex-row items-center justify-center h-full">
+                      <div className="w-full md:w-1/2 h-[200px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={generalSuccessData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={4}
+                              dataKey="value"
+                            >
+                              {generalSuccessData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip content={<CustomPieTooltip />} />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="w-full md:w-1/2 space-y-3 font-bold text-xs pr-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                          <span className="text-slate-500">تم تقييمهم بالكامل:</span>
+                          <span className="text-lg font-black text-slate-800">{evaluatedCount}</span>
+                        </div>
+                        {generalSuccessData.map((d, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></span>
+                              <span className="text-slate-600">{d.name}:</span>
+                            </div>
+                            <span className="text-slate-800 font-black">
+                              {d.value} ({evaluatedCount > 0 ? ((d.value / evaluatedCount) * 100).toFixed(1) : 0}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">
+                      بانتظار اكتمال التقييم لبعض المتسابقين لعرض نسب النجاح
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Level specific charts & distribution */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Chart 3: Level Distribution */}
+              <Card className="bg-white border-slate-200">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    توزيع المشاركين حسب مستويات المسابقة
+                  </CardTitle>
+                  <CardDescription>
+                    نسبة عدد الطلاب المسجلين في كل مستوى من مستويات المسابقة
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="h-[320px] relative flex flex-col justify-between">
+                  {isMounted && levelDistributionHasData ? (
+                    <div className="flex flex-col md:flex-row items-center justify-center h-full">
+                      <div className="w-full md:w-1/2 h-[220px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={levelDistributionData}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={80}
+                              paddingAngle={4}
+                              dataKey="value"
+                            >
+                              {levelDistributionData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={levelColors[index % levelColors.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip content={<CustomPieTooltip />} />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="w-full md:w-1/2 space-y-2.5 font-bold text-xs pr-4 max-h-[260px] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1 sticky top-0 bg-white">
+                          <span className="text-slate-500">إجمالي الطلاب:</span>
+                          <span className="text-lg font-black text-slate-800">{results.length}</span>
+                        </div>
+                        {levelDistributionData.map((d, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: levelColors[i % levelColors.length] }}></span>
+                              <span className="text-slate-600 truncate max-w-[120px]" title={d.name}>{d.name}:</span>
+                            </div>
+                            <span className="text-slate-800 font-black">
+                              {d.value} ({results.length > 0 ? ((d.value / results.length) * 100).toFixed(1) : 0}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">
+                      لا توجد بيانات مستويات متاحة حالياً
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Chart 4: Level Success Rate (interactive dropdown) */}
+              <Card className="bg-white border-slate-200">
+                <CardHeader className="pb-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-amber-500" />
+                        نسبة النجاح لكل مستوى بالتفصيل
+                      </CardTitle>
+                      <CardDescription>
+                        حالة الاجتياز (كم اللي اجتاز وكم اللي ما اجتاز) لمستوى محدد
+                      </CardDescription>
+                    </div>
+                    {competition?.levels && competition.levels.length > 0 && (
+                      <Select 
+                        value={activeLevelId} 
+                        onValueChange={(val) => setSelectedAnalysisLevelId(val)}
+                      >
+                        <SelectTrigger className="w-[180px] h-9 text-xs font-bold rounded-xl border-slate-200 focus:ring-emerald-500">
+                          <SelectValue placeholder="اختر المستوى..." />
+                        </SelectTrigger>
+                        <SelectContent className="text-xs font-bold">
+                          {competition.levels.map((l: any) => (
+                            <SelectItem key={l.id} value={l.id.toString()}>
+                              {l.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="h-[320px] relative flex flex-col justify-between">
+                  {isMounted && activeLevel ? (
+                    <div className="flex flex-col h-full justify-between">
+                      {/* Sub header for selected level stats */}
+                      <div className="grid grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded-xl text-center text-[10px] font-bold text-slate-600 border border-slate-100">
+                        <div>
+                          <p className="text-slate-400">إجمالي المسجلين</p>
+                          <p className="text-sm font-black text-slate-800 mt-0.5">{levelTotal}</p>
+                        </div>
+                        <div>
+                          <p className="text-emerald-600">تم تقييمهم</p>
+                          <p className="text-sm font-black text-emerald-700 mt-0.5">{levelEvaluatedCount}</p>
+                        </div>
+                        <div>
+                          <p className="text-blue-600">مجتازين (نجاح)</p>
+                          <p className="text-sm font-black text-blue-700 mt-0.5">{levelFullyPassed + levelPartiallyPassed}</p>
+                        </div>
+                        <div>
+                          <p className="text-red-600">غير مجتازين</p>
+                          <p className="text-sm font-black text-red-700 mt-0.5">{levelNotPassed}</p>
+                        </div>
+                      </div>
+
+                      {levelSuccessHasData ? (
+                        <div className="flex flex-col md:flex-row items-center justify-center flex-1">
+                          <div className="w-full md:w-1/2 h-[170px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <RechartsPieChart>
+                                <Pie
+                                  data={levelSuccessData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={50}
+                                  outerRadius={70}
+                                  paddingAngle={4}
+                                  dataKey="value"
+                                >
+                                  {levelSuccessData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <Tooltip content={<CustomPieTooltip />} />
+                              </RechartsPieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="w-full md:w-1/2 space-y-2 font-bold text-xs pr-4">
+                            <div className="text-[11px] text-slate-500 pb-1 border-b border-slate-100 flex items-center justify-between">
+                              <span>نسبة النجاح والاجتياز في {activeLevel.name}:</span>
+                            </div>
+                            {levelSuccessData.map((d, i) => (
+                              <div key={i} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></span>
+                                  <span className="text-slate-600">{d.name}:</span>
+                                </div>
+                                <span className="text-slate-800 font-black">
+                                  {d.value} ({levelEvaluatedCount > 0 ? ((d.value / levelEvaluatedCount) * 100).toFixed(1) : 0}%)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-400 text-xs">
+                          <Trophy className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+                          <span>لا توجد تقييمات مكتملة بعد لمستوى ({activeLevel.name})</span>
+                          <span className="text-[10px] text-slate-400/80">يجب اكتمال تقييمين على الأقل لمتسابق واحد بالكامل</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-400 text-xs">
+                      يرجى اختيار مستوى لعرض بياناته بالتفصيل
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Chart */}
