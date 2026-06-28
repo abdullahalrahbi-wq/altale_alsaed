@@ -22,6 +22,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedAnalysisLevelId, setSelectedAnalysisLevelId] = useState<string>("");
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [pdfDetailedExporting, setPdfDetailedExporting] = useState(false);
 
   const getLevelStats = (levelId: string | number) => {
     const levelContestants = results.filter(r => r.level_id?.toString() === levelId.toString());
@@ -505,6 +506,627 @@ export default function AdminDashboard() {
       toast.error(`حدث خطأ أثناء تصدير ملف الـ PDF: ${error?.message || error?.toString() || "يرجى المحاولة مرة أخرى"}`);
     } finally {
       setPdfExporting(false);
+    }
+  };
+
+  const handleExportDetailedResultsPDF = async () => {
+    setPdfDetailedExporting(true);
+    const loadingToastId = toast.loading("جاري إعداد وتصدير كشف النتائج النهائية والترتيب بصيغة PDF...");
+    try {
+      // Safe CORS logo fetch
+      let safeLogoUrl = "";
+      const logoToFetch = globalSettings?.site_logo || competition?.logo_url;
+      if (logoToFetch) {
+        try {
+          const response = await fetch(logoToFetch);
+          if (response.ok) {
+            const blob = await response.blob();
+            safeLogoUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          }
+        } catch (e) {
+          console.warn("Logo URL could not be fetched with CORS. Fallback to default emblem.", e);
+        }
+      }
+
+      const logoHtml = safeLogoUrl
+        ? `<img src="${safeLogoUrl}" style="max-height: 70px; max-width: 70px; object-fit: contain; border-radius: 12px; border: 1.5px solid #dfb455; padding: 2px;" />`
+        : `<div style="width: 70px; height: 70px; border-radius: 50%; background: linear-gradient(135deg, #b68d2b 0%, #dfb455 100%); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; color: #040d1a; border: 2px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.35);">📖</div>`;
+
+      // 1. Filter passed contestants (average_score >= 75 and all juzs average >= 75)
+      const passedContestants = results.filter(r => {
+        if (r.judge_count < 2) return false;
+        const finalScore = r.average_score || 0;
+        const passedJuz = r.juz_details?.filter((j: any) => j.average >= 75) || [];
+        const passedJuzCount = passedJuz.length;
+        const totalJuzCount = r.juz_count || 0;
+        return passedJuzCount === totalJuzCount && finalScore >= 75;
+      });
+
+      if (passedContestants.length === 0) {
+        toast.dismiss(loadingToastId);
+        toast.error("لا يوجد متسابقين مجازين حالياً لتصدير نتائجهم!");
+        setPdfDetailedExporting(false);
+        return;
+      }
+
+      const passedContestantsCount = passedContestants.length;
+      const passedMales = passedContestants.filter(c => c.gender === "male");
+      const passedFemales = passedContestants.filter(c => c.gender === "female");
+
+      const passedMalesCount = passedMales.length;
+      const passedFemalesCount = passedFemales.length;
+
+      const printContainer = document.createElement("div");
+      printContainer.id = "detailed-pdf-print-container";
+      printContainer.style.position = "fixed";
+      printContainer.style.left = "0";
+      printContainer.style.top = "0";
+      printContainer.style.width = "794px";
+      printContainer.style.zIndex = "-99999";
+      printContainer.style.opacity = "1";
+      printContainer.style.pointerEvents = "none";
+      printContainer.style.backgroundColor = "#030c17";
+      printContainer.style.direction = "rtl";
+
+      let pagesHtml = `
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap');
+          .print-page {
+            font-family: 'Tajawal', sans-serif !important;
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          table {
+            border-collapse: collapse;
+            width: 100%;
+          }
+          th, td {
+            border-collapse: collapse;
+          }
+        </style>
+      `;
+
+      // --- PAGE 1: COVER PAGE ---
+      pagesHtml += `
+        <div class="print-page" style="width: 794px; height: 1123px; position: relative; padding: 45px 50px 85px 50px; box-sizing: border-box; background: linear-gradient(135deg, #05101e 0%, #0d2240 100%); color: white; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; direction: rtl; margin-bottom: 0px;">
+          <!-- Frame -->
+          <div style="position: absolute; top: 20px; bottom: 20px; left: 20px; right: 20px; border: 2px solid #dfb455; border-radius: 12px; pointer-events: none; z-index: 5;"></div>
+          <div style="position: absolute; top: 25px; bottom: 25px; left: 25px; right: 25px; border: 1px dashed #dfb455; border-radius: 8px; pointer-events: none; z-index: 5;"></div>
+          
+          <!-- Left Lantern -->
+          <svg width="35" height="80" viewBox="0 0 40 90" style="position: absolute; top: 20px; left: 35px; color: #dfb455; fill: currentColor; z-index: 6;">
+            <line x1="20" y1="0" x2="20" y2="25" stroke="#dfb455" stroke-width="1.5" />
+            <path d="M12 25 L28 25 L20 18 Z" />
+            <path d="M10 25 L30 25 L34 50 L20 60 L6 50 Z" fill="none" stroke="#dfb455" stroke-width="1.5" />
+            <line x1="16" y1="25" x2="14" y2="51" stroke="#dfb455" stroke-width="1" />
+            <line x1="24" y1="25" x2="26" y2="51" stroke="#dfb455" stroke-width="1" />
+            <circle cx="20" cy="40" r="3" fill="#dfb455" />
+            <line x1="20" y1="60" x2="20" y2="75" stroke="#dfb455" stroke-width="1.5" />
+          </svg>
+          <!-- Right Lantern -->
+          <svg width="35" height="80" viewBox="0 0 40 90" style="position: absolute; top: 20px; right: 35px; color: #dfb455; fill: currentColor; z-index: 6;">
+            <line x1="20" y1="0" x2="20" y2="25" stroke="#dfb455" stroke-width="1.5" />
+            <path d="M12 25 L28 25 L20 18 Z" />
+            <path d="M10 25 L30 25 L34 50 L20 60 L6 50 Z" fill="none" stroke="#dfb455" stroke-width="1.5" />
+            <line x1="16" y1="25" x2="14" y2="51" stroke="#dfb455" stroke-width="1" />
+            <line x1="24" y1="25" x2="26" y2="51" stroke="#dfb455" stroke-width="1" />
+            <circle cx="20" cy="40" r="3" fill="#dfb455" />
+            <line x1="20" y1="60" x2="20" y2="75" stroke="#dfb455" stroke-width="1.5" />
+          </svg>
+
+          <!-- Header Logo -->
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 40px; z-index: 10;">
+            ${logoHtml}
+            <div style="font-size: 13px; color: #dfb455; font-weight: bold; margin-top: 8px; letter-spacing: 1px;">مدرسة الطالع السعيد لتدريس القرآن الكريم</div>
+          </div>
+
+          <!-- Title Badge -->
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 10; margin-top: -30px;">
+            <div style="border: 2px solid #dfb455; padding: 35px 50px; border-radius: 24px; background: rgba(12, 35, 63, 0.7); backdrop-filter: blur(8px); box-shadow: 0 15px 35px rgba(0,0,0,0.4); max-width: 600px; position: relative;">
+              <!-- Corner ornaments -->
+              <div style="position: absolute; top: 10px; left: 10px; width: 15px; height: 15px; border-top: 2px solid #dfb455; border-left: 2px solid #dfb455;"></div>
+              <div style="position: absolute; top: 10px; right: 10px; width: 15px; height: 15px; border-top: 2px solid #dfb455; border-right: 2px solid #dfb455;"></div>
+              <div style="position: absolute; bottom: 10px; left: 10px; width: 15px; height: 15px; border-bottom: 2px solid #dfb455; border-left: 2px solid #dfb455;"></div>
+              <div style="position: absolute; bottom: 10px; right: 10px; width: 15px; height: 15px; border-bottom: 2px solid #dfb455; border-right: 2px solid #dfb455;"></div>
+              
+              <div style="font-size: 14px; font-weight: bold; color: #dfb455; letter-spacing: 2px; margin-bottom: 12px; text-transform: uppercase;">نتائـج مسابقـة</div>
+              <h1 style="font-size: 28px; font-weight: 900; color: #ffffff; margin: 0 0 15px 0; line-height: 1.4; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                ${competition?.name || "مسابقة حفظ القرآن الكريم"}
+              </h1>
+              <div style="font-size: 16px; font-weight: bold; color: #dfb455; background: rgba(223, 180, 85, 0.15); padding: 6px 20px; border-radius: 99px; display: inline-block; border: 1px solid rgba(223, 180, 85, 0.3); margin-bottom: 25px;">
+                كشف النتائج النهائية والترتيب
+              </div>
+              
+              <div style="display: flex; gap: 15px; justify-content: center; font-size: 13px; font-weight: bold;">
+                <div style="border: 1px solid #dfb455; padding: 6px 15px; border-radius: 10px; background: rgba(5, 15, 29, 0.8); color: #dfb455; min-width: 100px;">عام المسابقة</div>
+                <div style="border: 1px solid #dfb455; padding: 6px 15px; border-radius: 10px; background: rgba(5, 15, 29, 0.8); color: #dfb455; min-width: 100px;">${competition?.year || new Date().getFullYear()} م</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mosque skyline at the bottom -->
+          <svg viewBox="0 0 794 100" style="position: absolute; bottom: 20px; left: 25px; width: 744px; height: 65px; fill: #040d1a; pointer-events: none; z-index: 2; opacity: 0.95;">
+            <path d="M 0 100 L 0 80 L 15 80 L 15 50 L 20 40 L 25 50 L 25 80 L 45 80 Q 65 50 85 80 L 105 80 L 105 20 L 108 15 L 110 20 L 110 80 L 140 80 Q 175 40 210 80 L 230 80 L 230 60 L 240 60 L 240 80 L 270 80 L 270 10 L 273 5 L 275 10 L 275 80 L 310 80 Q 340 30 370 80 L 424 80 Q 454 30 484 80 L 519 80 L 519 10 L 522 5 L 524 10 L 524 80 L 554 80 L 554 60 L 564 60 L 564 80 L 584 80 Q 619 40 654 80 L 684 80 L 684 20 L 687 15 L 689 20 L 689 80 L 709 80 Q 729 50 749 80 L 769 80 L 769 50 L 774 40 L 779 50 L 779 80 L 794 80 L 794 100 Z" />
+          </svg>
+        </div>
+      `;
+
+      // --- PAGE 2: STATS PAGE ---
+      pagesHtml += `
+        <div class="print-page" style="width: 794px; height: 1123px; position: relative; padding: 45px 50px 85px 50px; box-sizing: border-box; background: linear-gradient(135deg, #05101e 0%, #0d2240 100%); color: white; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; direction: rtl; margin-bottom: 0px;">
+          <!-- Frame -->
+          <div style="position: absolute; top: 20px; bottom: 20px; left: 20px; right: 20px; border: 2px solid #dfb455; border-radius: 12px; pointer-events: none; z-index: 5;"></div>
+          <div style="position: absolute; top: 25px; bottom: 25px; left: 25px; right: 25px; border: 1px dashed #dfb455; border-radius: 8px; pointer-events: none; z-index: 5;"></div>
+          
+          <!-- Left Lantern -->
+          <svg width="35" height="80" viewBox="0 0 40 90" style="position: absolute; top: 20px; left: 35px; color: #dfb455; fill: currentColor; z-index: 6;">
+            <line x1="20" y1="0" x2="20" y2="25" stroke="#dfb455" stroke-width="1.5" />
+            <path d="M12 25 L28 25 L20 18 Z" />
+            <path d="M10 25 L30 25 L34 50 L20 60 L6 50 Z" fill="none" stroke="#dfb455" stroke-width="1.5" />
+            <line x1="16" y1="25" x2="14" y2="51" stroke="#dfb455" stroke-width="1" />
+            <line x1="24" y1="25" x2="26" y2="51" stroke="#dfb455" stroke-width="1" />
+            <circle cx="20" cy="40" r="3" fill="#dfb455" />
+            <line x1="20" y1="60" x2="20" y2="75" stroke="#dfb455" stroke-width="1.5" />
+          </svg>
+          <!-- Right Lantern -->
+          <svg width="35" height="80" viewBox="0 0 40 90" style="position: absolute; top: 20px; right: 35px; color: #dfb455; fill: currentColor; z-index: 6;">
+            <line x1="20" y1="0" x2="20" y2="25" stroke="#dfb455" stroke-width="1.5" />
+            <path d="M12 25 L28 25 L20 18 Z" />
+            <path d="M10 25 L30 25 L34 50 L20 60 L6 50 Z" fill="none" stroke="#dfb455" stroke-width="1.5" />
+            <line x1="16" y1="25" x2="14" y2="51" stroke="#dfb455" stroke-width="1" />
+            <line x1="24" y1="25" x2="26" y2="51" stroke="#dfb455" stroke-width="1" />
+            <circle cx="20" cy="40" r="3" fill="#dfb455" />
+            <line x1="20" y1="60" x2="20" y2="75" stroke="#dfb455" stroke-width="1.5" />
+          </svg>
+
+          <!-- Header Logo -->
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 40px; z-index: 10;">
+            ${logoHtml}
+            <div style="font-size: 13px; color: #dfb455; font-weight: bold; margin-top: 8px;">مدرسة الطالع السعيد لتدريس القرآن الكريم</div>
+          </div>
+
+          <!-- Centered Stats -->
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; width: 100%;">
+            <div style="font-size: 20px; font-weight: 900; color: #dfb455; margin-bottom: 30px; text-align: center; border-bottom: 2px solid #dfb455; padding-bottom: 10px; width: 280px; letter-spacing: 1px;">
+              📊 إحصائيات عامة للمسابقة
+            </div>
+            
+            <!-- Big Number of Participants Card -->
+            <div style="background: rgba(12, 35, 63, 0.8); border: 2px solid #dfb455; border-radius: 24px; padding: 25px; width: 380px; text-align: center; margin-bottom: 40px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); position: relative; overflow: hidden;">
+              <div style="font-size: 14px; font-weight: bold; color: #dfb455; margin-bottom: 8px;">إجمالي عدد المجتازين المعتمدين</div>
+              <div style="font-size: 54px; font-weight: 900; color: #ffffff; font-family: monospace; line-height: 1; margin: 10px 0;">
+                ${passedContestantsCount}
+              </div>
+              <div style="font-size: 13px; color: #94a3b8; font-weight: bold;">متسابق ومتسابقة اجتازوا المسابقة بنجاح</div>
+            </div>
+            
+            <!-- Gender Breakdown Cards -->
+            <div style="display: flex; gap: 30px; width: 100%; justify-content: center; max-width: 600px;">
+              <!-- Males Card -->
+              <div style="flex: 1; background: rgba(30, 58, 138, 0.4); border: 1.5px solid #3b82f6; border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.2);">
+                <div style="font-size: 32px; margin-bottom: 8px;">👨</div>
+                <div style="font-size: 15px; font-weight: 900; color: #93c5fd; margin-bottom: 5px;">الذكور المجتازين</div>
+                <div style="font-size: 32px; font-weight: 900; color: #ffffff; font-family: monospace; margin-bottom: 5px;">${passedMalesCount}</div>
+                <div style="font-size: 12px; color: #60a5fa; font-weight: bold;">${((passedMalesCount / (passedContestantsCount || 1)) * 100).toFixed(1)}% من المجتازين</div>
+              </div>
+              
+              <!-- Females Card -->
+              <div style="flex: 1; background: rgba(131, 24, 67, 0.4); border: 1.5px solid #f43f5e; border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.2);">
+                <div style="font-size: 32px; margin-bottom: 8px;">👩</div>
+                <div style="font-size: 15px; font-weight: 900; color: #f9a8d4; margin-bottom: 5px;">الإناث المجتازات</div>
+                <div style="font-size: 32px; font-weight: 900; color: #ffffff; font-family: monospace; margin-bottom: 5px;">${passedFemalesCount}</div>
+                <div style="font-size: 12px; color: #f43f5e; font-weight: bold;">${((passedFemalesCount / (passedContestantsCount || 1)) * 100).toFixed(1)}% من المجتازات</div>
+              </div>
+            </div>
+            
+            <div style="margin-top: 50px; font-size: 11px; color: #dfb455; font-weight: bold; text-align: center; border: 1px solid rgba(223, 180, 85, 0.3); padding: 10px 25px; border-radius: 8px; background: rgba(12, 35, 63, 0.4); max-width: 500px; line-height: 1.5;">
+              ملاحظة: هذا التقرير يضم حصرياً كشوفات وبيانات المتسابقين الحاصلين على صفة "مجاز" في مستويات تقييم الحفظ والذين أكملوا كافة الاختبارات بدرجة نجاح 75% فما فوق.
+            </div>
+          </div>
+
+          <!-- Mosque skyline at the bottom -->
+          <svg viewBox="0 0 794 100" style="position: absolute; bottom: 20px; left: 25px; width: 744px; height: 65px; fill: #040d1a; pointer-events: none; z-index: 2; opacity: 0.95;">
+            <path d="M 0 100 L 0 80 L 15 80 L 15 50 L 20 40 L 25 50 L 25 80 L 45 80 Q 65 50 85 80 L 105 80 L 105 20 L 108 15 L 110 20 L 110 80 L 140 80 Q 175 40 210 80 L 230 80 L 230 60 L 240 60 L 240 80 L 270 80 L 270 10 L 273 5 L 275 10 L 275 80 L 310 80 Q 340 30 370 80 L 424 80 Q 454 30 484 80 L 519 80 L 519 10 L 522 5 L 524 10 L 524 80 L 554 80 L 554 60 L 564 60 L 564 80 L 584 80 Q 619 40 654 80 L 684 80 L 684 20 L 687 15 L 689 20 L 689 80 L 709 80 Q 729 50 749 80 L 769 80 L 769 50 L 774 40 L 779 50 L 779 80 L 794 80 L 794 100 Z" />
+          </svg>
+        </div>
+      `;
+
+      // Helper function to build level page table
+      const buildLevelPageHtml = (level: any, gender: "male" | "female", contestantsChunk: any[], pageNum: number, totalPages: number, pageStartIdx: number, scoresList: number[]) => {
+        const genderTitle = gender === "male" ? "أولاً: نتائج الذكور" : "ثانياً: نتائج الإناث";
+        const pageIndicator = totalPages > 1 ? `(${pageNum}/${totalPages})` : "";
+        const juzCount = level.juz_count || 1;
+        const isMultiRow = juzCount > 5;
+
+        // Header and columns
+        let tableHeaderHtml = "";
+        if (!isMultiRow) {
+          tableHeaderHtml = `
+            <tr style="background: linear-gradient(135deg, #dfb455 0%, #b68d2b 100%); color: #040d1a;">
+              <th style="padding: 10px 6px; font-size: 11px; font-weight: 900; width: 35px; text-align: center; border: 1px solid #dfb455;">م</th>
+              <th style="padding: 10px 8px; font-size: 11px; font-weight: 900; text-align: right; border: 1px solid #dfb455;">الاسم</th>
+              <th style="padding: 10px 8px; font-size: 11px; font-weight: 900; text-align: right; border: 1px solid #dfb455; width: 110px;">البلد/الولاية</th>
+              ${Array.from({ length: juzCount }).map((_, i) => `
+                <th style="padding: 10px 4px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455;">جزء ${i+1}</th>
+              `).join('')}
+              <th style="padding: 10px 6px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 85px;">الدرجة النهائية</th>
+              <th style="padding: 10px 6px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 90px;">المركز</th>
+            </tr>
+          `;
+        } else {
+          tableHeaderHtml = `
+            <tr style="background: linear-gradient(135deg, #dfb455 0%, #b68d2b 100%); color: #040d1a;">
+              <th style="padding: 10px 6px; font-size: 11px; font-weight: 900; width: 35px; text-align: center; border: 1px solid #dfb455;">م</th>
+              <th style="padding: 10px 8px; font-size: 11px; font-weight: 900; text-align: right; border: 1px solid #dfb455;">الاسم</th>
+              <th style="padding: 10px 8px; font-size: 11px; font-weight: 900; text-align: right; border: 1px solid #dfb455; width: 110px;">البلد/الولاية</th>
+              <th style="padding: 10px 4px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 62px;">١</th>
+              <th style="padding: 10px 4px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 62px;">٢</th>
+              <th style="padding: 10px 4px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 62px;">٣</th>
+              <th style="padding: 10px 4px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 62px;">٤</th>
+              <th style="padding: 10px 4px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 62px;">٥</th>
+              <th style="padding: 10px 6px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 75px;">الدرجة</th>
+              <th style="padding: 10px 6px; font-size: 11px; font-weight: 900; text-align: center; border: 1px solid #dfb455; width: 90px;">المركز</th>
+            </tr>
+          `;
+        }
+
+        let tableRowsHtml = "";
+        contestantsChunk.forEach((c, idx) => {
+          const serial = pageStartIdx + idx + 1;
+          const score = c.average_score || 0;
+          
+          // Calculate rank correctly
+          const rankNum = scoresList.filter(s => s > score).length + 1;
+          const count = scoresList.filter(s => s === score).length;
+          const isDuplicate = count > 1;
+          let rankText = "";
+          if (rankNum === 1) {
+            rankText = isDuplicate ? "الأول مكرر" : "الأول";
+          } else if (rankNum === 2) {
+            rankText = isDuplicate ? "الثاني مكرر" : "الثاني";
+          } else if (rankNum === 3) {
+            rankText = isDuplicate ? "الثالث مكرر" : "الثالث";
+          } else {
+            rankText = "مجاز للجميع";
+          }
+          
+          let rankStyle = "color: #ffffff; background: rgba(223, 180, 85, 0.1); border: 1px solid rgba(223, 180, 85, 0.3);";
+          if (rankText.includes("الأول")) {
+            rankStyle = "color: #040d1a; background: linear-gradient(135deg, #ffd700 0%, #dfb455 100%); font-weight: 900; border: 1.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.2);";
+          } else if (rankText.includes("الثاني")) {
+            rankStyle = "color: #ffffff; background: linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%); font-weight: 900; border: 1.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.2);";
+          } else if (rankText.includes("الثالث")) {
+            rankStyle = "color: #ffffff; background: linear-gradient(135deg, #d97706 0%, #b45309 100%); font-weight: 900; border: 1.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.2);";
+          } else {
+            rankStyle = "color: #dfb455; background: rgba(223, 180, 85, 0.05); border: 1px solid rgba(223, 180, 85, 0.25);";
+          }
+
+          const rowBg = idx % 2 === 0 ? "rgba(12, 35, 63, 0.45)" : "rgba(6, 17, 32, 0.45)";
+
+          if (!isMultiRow) {
+            tableRowsHtml += `
+              <tr style="background: ${rowBg}; border-bottom: 1px solid rgba(223, 180, 85, 0.15);">
+                <td style="padding: 10px 6px; font-size: 11px; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); color: #94a3b8; font-weight: bold;">${serial}</td>
+                <td style="padding: 10px 8px; font-size: 11px; font-weight: bold; text-align: right; border: 1px solid rgba(223, 180, 85, 0.15); color: #ffffff;">${c.name}</td>
+                <td style="padding: 10px 8px; font-size: 11px; text-align: right; border: 1px solid rgba(223, 180, 85, 0.15); color: #cbd5e1;">${c.town || "-"}</td>
+                ${Array.from({ length: juzCount }).map((_, i) => {
+                  const juz = c.juz_details?.[i];
+                  const juzScore = juz ? (juz.average || 0) : 0;
+                  return `
+                    <td style="padding: 10px 4px; font-size: 11px; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); color: #93c5fd; font-family: monospace;">
+                      ${juzScore ? juzScore.toFixed(1) : "-"}
+                    </td>
+                  `;
+                }).join('')}
+                <td style="padding: 10px 6px; font-size: 12px; font-weight: 900; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); color: #10b981; font-family: monospace;">
+                  ${c.average_score ? c.average_score.toFixed(2) : "-"}
+                </td>
+                <td style="padding: 6px; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15);">
+                  <div style="font-size: 10px; padding: 4px 8px; border-radius: 6px; display: inline-block; ${rankStyle}">
+                    ${rankText}
+                  </div>
+                </td>
+              </tr>
+            `;
+          } else {
+            const partsPerRow = 5;
+            const numSubRows = Math.ceil(juzCount / partsPerRow);
+            
+            for (let sr = 0; sr < numSubRows; sr++) {
+              let partCells = "";
+              for (let p = 0; p < partsPerRow; p++) {
+                const partIdx = sr * partsPerRow + p;
+                if (partIdx < juzCount) {
+                  const juz = c.juz_details?.[partIdx];
+                  const juzScore = juz ? (juz.average || 0) : 0;
+                  partCells += `
+                    <td style="padding: 6px 4px; font-size: 10px; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); color: #93c5fd; font-family: monospace; background: rgba(5, 15, 29, 0.2);">
+                      <div style="font-size: 8px; color: #dfb455; margin-bottom: 2px;">ج${partIdx+1}</div>
+                      <div style="font-weight: bold;">${juzScore ? juzScore.toFixed(1) : "-"}</div>
+                    </td>
+                  `;
+                } else {
+                  partCells += `
+                    <td style="padding: 6px 4px; font-size: 10px; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); color: rgba(148, 163, 184, 0.3); font-family: monospace;">
+                      -
+                    </td>
+                  `;
+                }
+              }
+
+              if (sr === 0) {
+                tableRowsHtml += `
+                  <tr style="background: ${rowBg};">
+                    <td rowspan="${numSubRows}" style="padding: 8px 4px; font-size: 11px; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); color: #94a3b8; font-weight: bold; vertical-align: middle;">${serial}</td>
+                    <td rowspan="${numSubRows}" style="padding: 8px 8px; font-size: 11px; font-weight: bold; text-align: right; border: 1px solid rgba(223, 180, 85, 0.15); color: #ffffff; vertical-align: middle;">${c.name}</td>
+                    <td rowspan="${numSubRows}" style="padding: 8px 8px; font-size: 11px; text-align: right; border: 1px solid rgba(223, 180, 85, 0.15); color: #cbd5e1; vertical-align: middle;">${c.town || "-"}</td>
+                    ${partCells}
+                    <td rowspan="${numSubRows}" style="padding: 8px 4px; font-size: 12px; font-weight: 900; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); color: #10b981; font-family: monospace; vertical-align: middle;">${c.average_score ? c.average_score.toFixed(2) : "-"}</td>
+                    <td rowspan="${numSubRows}" style="padding: 6px; text-align: center; border: 1px solid rgba(223, 180, 85, 0.15); vertical-align: middle;">
+                      <div style="font-size: 10px; padding: 4px 8px; border-radius: 6px; display: inline-block; ${rankStyle}">
+                        ${rankText}
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              } else {
+                tableRowsHtml += `
+                  <tr style="background: ${rowBg}; border-bottom: ${sr === numSubRows - 1 ? '1px solid rgba(223, 180, 85, 0.15)' : 'none'};">
+                    ${partCells}
+                  </tr>
+                `;
+              }
+            }
+          }
+        });
+
+        return `
+          <div class="print-page" style="width: 794px; height: 1123px; position: relative; padding: 45px 50px 85px 50px; box-sizing: border-box; background: linear-gradient(135deg, #05101e 0%, #0d2240 100%); color: white; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; direction: rtl; margin-bottom: 0px;">
+            <!-- Frame -->
+            <div style="position: absolute; top: 20px; bottom: 20px; left: 20px; right: 20px; border: 2px solid #dfb455; border-radius: 12px; pointer-events: none; z-index: 5;"></div>
+            <div style="position: absolute; top: 25px; bottom: 25px; left: 25px; right: 25px; border: 1px dashed #dfb455; border-radius: 8px; pointer-events: none; z-index: 5;"></div>
+            
+            <!-- Left Lantern -->
+            <svg width="35" height="80" viewBox="0 0 40 90" style="position: absolute; top: 20px; left: 35px; color: #dfb455; fill: currentColor; z-index: 6;">
+              <line x1="20" y1="0" x2="20" y2="25" stroke="#dfb455" stroke-width="1.5" />
+              <path d="M12 25 L28 25 L20 18 Z" />
+              <path d="M10 25 L30 25 L34 50 L20 60 L6 50 Z" fill="none" stroke="#dfb455" stroke-width="1.5" />
+              <line x1="16" y1="25" x2="14" y2="51" stroke="#dfb455" stroke-width="1" />
+              <line x1="24" y1="25" x2="26" y2="51" stroke="#dfb455" stroke-width="1" />
+              <circle cx="20" cy="40" r="3" fill="#dfb455" />
+              <line x1="20" y1="60" x2="20" y2="75" stroke="#dfb455" stroke-width="1.5" />
+            </svg>
+            <!-- Right Lantern -->
+            <svg width="35" height="80" viewBox="0 0 40 90" style="position: absolute; top: 20px; right: 35px; color: #dfb455; fill: currentColor; z-index: 6;">
+              <line x1="20" y1="0" x2="20" y2="25" stroke="#dfb455" stroke-width="1.5" />
+              <path d="M12 25 L28 25 L20 18 Z" />
+              <path d="M10 25 L30 25 L34 50 L20 60 L6 50 Z" fill="none" stroke="#dfb455" stroke-width="1.5" />
+              <line x1="16" y1="25" x2="14" y2="51" stroke="#dfb455" stroke-width="1" />
+              <line x1="24" y1="25" x2="26" y2="51" stroke="#dfb455" stroke-width="1" />
+              <circle cx="20" cy="40" r="3" fill="#dfb455" />
+              <line x1="20" y1="60" x2="20" y2="75" stroke="#dfb455" stroke-width="1.5" />
+            </svg>
+
+            <!-- Header Logo -->
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 20px; z-index: 10;">
+              ${logoHtml}
+              <div style="font-size: 11px; color: #dfb455; font-weight: bold; margin-top: 5px;">مدرسة الطالع السعيد لتدريس القرآن الكريم</div>
+            </div>
+
+            <!-- Page Title Card -->
+            <div style="text-align: center; margin-bottom: 15px; z-index: 10;">
+              <div style="display: inline-block; background: linear-gradient(135deg, #dfb455 0%, #b68d2b 100%); color: #040d1a; font-size: 13px; font-weight: 900; padding: 6px 30px; border-radius: 10px; border: 1.5px solid #ffffff; box-shadow: 0 4px 15px rgba(0,0,0,0.3); text-shadow: 0 1px 2px rgba(255,255,255,0.2); min-width: 250px; margin-bottom: 5px;">
+                ${genderTitle}
+              </div>
+              <h2 style="font-size: 15px; font-weight: 900; color: #ffffff; margin: 4px 0 0 0; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                ${level.name} ${pageIndicator}
+              </h2>
+            </div>
+
+            <!-- Data Table Container -->
+            <div style="flex: 1; z-index: 10; width: 100%; display: flex; flex-direction: column; justify-content: flex-start;">
+              <table style="width: 100%; border-collapse: collapse; box-shadow: 0 10px 20px rgba(0,0,0,0.35); border-radius: 12px; overflow: hidden; background: rgba(12, 35, 63, 0.6); border: 1.5px solid #dfb455; table-layout: fixed;">
+                <thead>
+                  ${tableHeaderHtml}
+                </thead>
+                <tbody>
+                  ${tableRowsHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Mosque skyline at the bottom -->
+            <svg viewBox="0 0 794 100" style="position: absolute; bottom: 20px; left: 25px; width: 744px; height: 65px; fill: #040d1a; pointer-events: none; z-index: 2; opacity: 0.95;">
+              <path d="M 0 100 L 0 80 L 15 80 L 15 50 L 20 40 L 25 50 L 25 80 L 45 80 Q 65 50 85 80 L 105 80 L 105 20 L 108 15 L 110 20 L 110 80 L 140 80 Q 175 40 210 80 L 230 80 L 230 60 L 240 60 L 240 80 L 270 80 L 270 10 L 273 5 L 275 10 L 275 80 L 310 80 Q 340 30 370 80 L 424 80 Q 454 30 484 80 L 519 80 L 519 10 L 522 5 L 524 10 L 524 80 L 554 80 L 554 60 L 564 60 L 564 80 L 584 80 Q 619 40 654 80 L 684 80 L 684 20 L 687 15 L 689 20 L 689 80 L 709 80 Q 729 50 749 80 L 769 80 L 769 50 L 774 40 L 779 50 L 779 80 L 794 80 L 794 100 Z" />
+            </svg>
+          </div>
+        `;
+      };
+
+      // Sort levels by rank ascending
+      const sortedLevels = [...(competition?.levels || [])].sort((a: any, b: any) => {
+        const rankA = a.rank !== undefined && a.rank !== null ? Number(a.rank) : 999;
+        const rankB = b.rank !== undefined && b.rank !== null ? Number(b.rank) : 999;
+        if (rankA !== rankB) return rankA - rankB;
+        return (b.juz_count || 0) - (a.juz_count || 0);
+      });
+
+      // --- 3. MALES PAGES BY LEVEL ---
+      sortedLevels.forEach((level: any) => {
+        const levelMales = passedMales
+          .filter(c => c.level_id?.toString() === level.id?.toString())
+          .sort((a, b) => (b.average_score || 0) - (a.average_score || 0));
+
+        if (levelMales.length > 0) {
+          const juzCount = level.juz_count || 1;
+          const subRows = juzCount <= 5 ? 1 : Math.ceil(juzCount / 5);
+          const itemsPerPage = juzCount <= 5 ? 11 : Math.max(1, Math.floor(11 / subRows));
+          
+          const totalPages = Math.ceil(levelMales.length / itemsPerPage);
+          for (let pNum = 1; pNum <= totalPages; pNum++) {
+            const startIdx = (pNum - 1) * itemsPerPage;
+            const endIdx = startIdx + itemsPerPage;
+            const chunk = levelMales.slice(startIdx, endIdx);
+            
+            const scoresList = levelMales.map(c => c.average_score || 0);
+            pagesHtml += buildLevelPageHtml(level, "male", chunk, pNum, totalPages, startIdx, scoresList);
+          }
+        }
+      });
+
+      // --- 4. FEMALES PAGES BY LEVEL ---
+      sortedLevels.forEach((level: any) => {
+        const levelFemales = passedFemales
+          .filter(c => c.level_id?.toString() === level.id?.toString())
+          .sort((a, b) => (b.average_score || 0) - (a.average_score || 0));
+
+        if (levelFemales.length > 0) {
+          const juzCount = level.juz_count || 1;
+          const subRows = juzCount <= 5 ? 1 : Math.ceil(juzCount / 5);
+          const itemsPerPage = juzCount <= 5 ? 11 : Math.max(1, Math.floor(11 / subRows));
+          
+          const totalPages = Math.ceil(levelFemales.length / itemsPerPage);
+          for (let pNum = 1; pNum <= totalPages; pNum++) {
+            const startIdx = (pNum - 1) * itemsPerPage;
+            const endIdx = startIdx + itemsPerPage;
+            const chunk = levelFemales.slice(startIdx, endIdx);
+            
+            const scoresList = levelFemales.map(c => c.average_score || 0);
+            pagesHtml += buildLevelPageHtml(level, "female", chunk, pNum, totalPages, startIdx, scoresList);
+          }
+        }
+      });
+
+      printContainer.innerHTML = pagesHtml;
+      document.body.appendChild(printContainer);
+
+      // Delay to allow web font to settle and render beautifully
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // Proxy computed style to convert modern OKLCH variables to standard RGB (for html2canvas support)
+      const oklchToRgb = (l: number, c: number, h: number) => {
+        const hRad = h * (Math.PI / 180);
+        const a = c * Math.cos(hRad);
+        const b_ = c * Math.sin(hRad);
+        
+        let l_ = l + 0.3963377774 * a + 0.2158037573 * b_;
+        let m = l - 0.1055613458 * a - 0.0638541728 * b_;
+        let s = l - 0.0894841775 * a - 1.2914855480 * b_;
+        
+        l_ = Math.pow(Math.max(0, l_), 3);
+        m = Math.pow(Math.max(0, m), 3);
+        s = Math.pow(Math.max(0, s), 3);
+        
+        const r = +4.0767416621 * l_ - 3.3077115913 * m + 0.2309699292 * s;
+        const g = -1.2684380046 * l_ + 2.6097574011 * m - 0.3413193965 * s;
+        const b_val = -0.0041960863 * l_ - 0.7034186147 * m + 1.7076147010 * s;
+        
+        const clamp = (val: number) => Math.min(255, Math.max(0, val));
+        const gamma = (val: number) => {
+          val = clamp(val);
+          return val > 0.0031308 ? 1.055 * Math.pow(val, 1 / 2.4) - 0.055 : 12.92 * val;
+        };
+        
+        return {
+          r: Math.round(gamma(r) * 255),
+          g: Math.round(gamma(g) * 255),
+          b: Math.round(gamma(b_val) * 255)
+        };
+      };
+
+      const parseAndConvertOklch = (oklchStr: string): string => {
+        if (!oklchStr || typeof oklchStr !== 'string' || !oklchStr.includes('oklch')) {
+          return oklchStr;
+        }
+        return oklchStr.replace(/oklch\s*\(\s*([0-9.]+%?)\s+([0-9.]+%?)\s+([0-9.]+(?:deg|rad|turn)?)(?:\s*\/\s*([0-9.]+%?))?\s*\)/gi, (match, p1, p2, p3, p4) => {
+          try {
+            let l = parseFloat(p1);
+            if (p1.includes('%')) l /= 100;
+            let c = parseFloat(p2);
+            if (p2.includes('%')) c /= 100;
+            let h = parseFloat(p3);
+            if (p3.includes('deg')) h = parseFloat(p3);
+            else if (p3.includes('rad')) h = parseFloat(p3) * (180 / Math.PI);
+            else if (p3.includes('turn')) h = parseFloat(p3) * 360;
+            let alpha = p4 ? parseFloat(p4) : 1;
+            if (p4 && p4.includes('%')) alpha /= 100;
+            const rgb = oklchToRgb(l, c, h);
+            return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+          } catch (e) {
+            return 'rgba(0, 0, 0, 0)';
+          }
+        });
+      };
+
+      const originalGetComputedStyle = window.getComputedStyle;
+      window.getComputedStyle = function (el, pseudoElt) {
+        const style = originalGetComputedStyle(el, pseudoElt);
+        return new Proxy(style, {
+          get(target, prop) {
+            if (prop === 'getPropertyValue') {
+              return function (propertyName: string) {
+                const val = target.getPropertyValue(propertyName);
+                if (val && typeof val === 'string' && val.includes('oklch')) {
+                  return parseAndConvertOklch(val);
+                }
+                return val;
+              };
+            }
+            const val = Reflect.get(target, prop);
+            if (typeof val === 'string' && val.includes('oklch')) {
+              return parseAndConvertOklch(val);
+            }
+            if (typeof val === 'function') {
+              return val.bind(target);
+            }
+            return val;
+          }
+        });
+      } as any;
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pages = printContainer.querySelectorAll(".print-page");
+
+      for (let pIdx = 0; pIdx < pages.length; pIdx++) {
+        const pageEl = pages[pIdx] as HTMLElement;
+        const canvas = await html2canvas(pageEl, {
+          scale: 2, // High resolution crisp export
+          useCORS: true,
+          backgroundColor: "#05101e",
+          width: 794,
+          height: 1123,
+          windowWidth: 794,
+          windowHeight: 1123
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        if (pIdx > 0) {
+          pdf.addPage();
+        }
+        // A4 page sizes are exactly 210mm x 297mm
+        pdf.addImage(imgData, "JPEG", 0, 0, 210, 297);
+      }
+
+      window.getComputedStyle = originalGetComputedStyle;
+
+      const cleanCompName = competition?.name ? competition.name.replace(/\s+/g, '_') : "المسابقة";
+      pdf.save(`كشف_النتائج_والترتيب_${cleanCompName}.pdf`);
+      toast.dismiss(loadingToastId);
+      toast.success("تم تصدير كشف النتائج والترتيب بصيغة PDF بنجاح!");
+
+      document.body.removeChild(printContainer);
+    } catch (error: any) {
+      toast.dismiss(loadingToastId);
+      console.error("PDF generation failed:", error);
+      toast.error(`حدث خطأ أثناء تصدير كشف الـ PDF: ${error?.message || error?.toString() || "يرجى المحاولة مرة أخرى"}`);
+    } finally {
+      setPdfDetailedExporting(false);
     }
   };
 
@@ -1700,10 +2322,29 @@ export default function AdminDashboard() {
                 <CardTitle>جدول النتائج التفصيلي</CardTitle>
                 <CardDescription>عرض وتصدير نتائج جميع المتسابقين</CardDescription>
               </div>
-              <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2 bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                <Download className="w-4 h-4" />
-                تصدير ملف Excel تفصيلي
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={exportToExcel} variant="outline" className="flex items-center gap-2 bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                  <Download className="w-4 h-4" />
+                  تصدير ملف Excel تفصيلي
+                </Button>
+                <Button
+                  onClick={handleExportDetailedResultsPDF}
+                  disabled={pdfDetailedExporting}
+                  className="flex items-center gap-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold shadow-md hover:shadow-lg transition-all duration-200 border border-amber-500/30"
+                >
+                  {pdfDetailedExporting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      جاري تصدير PDF النتائج...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      تصدير كشف النتائج والترتيب (PDF)
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
